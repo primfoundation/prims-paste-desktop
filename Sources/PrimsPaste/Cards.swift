@@ -1,3 +1,4 @@
+import AppKit
 import PrimsPasteCore
 import SwiftUI
 
@@ -111,6 +112,7 @@ struct PasteSticky: View {
     let onDragEnded: () -> Void
     let onConvert: (ConvertTarget) -> Void
     @State private var revealed = false
+    @State private var copied = false
 
     var body: some View {
         StickyCard(
@@ -119,19 +121,61 @@ struct PasteSticky: View {
         ) {
             if shuttered {
                 Text("covered").font(Ink.small).foregroundStyle(Ink.mute)
-            } else if revealed {
-                ScrollView {
-                    Text(bodyText())
+            } else if SecretFace.hidesPayload(
+                looksLikeKey: item.looksLikeKey, revealed: revealed, shuttered: false
+            ) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("••••••••")
                         .font(Ink.mono)
-                        .foregroundStyle(Ink.ink)
-                        .textSelection(.enabled)
+                        .foregroundStyle(Ink.mute)
+                    copyRevealRow
                 }
             } else {
-                Text(item.caption.isEmpty ? "••••  tap to peek" : "••••")
-                    .font(Ink.mono)
-                    .foregroundStyle(Ink.mute)
-                    .onTapGesture { revealed = true }
+                VStack(alignment: .leading, spacing: 8) {
+                    ScrollView {
+                        Text(bodyText())
+                            .font(Ink.mono)
+                            .foregroundStyle(Ink.ink)
+                            .textSelection(.enabled)
+                    }
+                    if SecretFace.showsCopyReveal(looksLikeKey: item.looksLikeKey, shuttered: false) {
+                        copyRevealRow
+                    }
+                }
             }
+        }
+    }
+
+    private var copyRevealRow: some View {
+        HStack(spacing: 8) {
+            faceBtn(copied ? "copied" : "copy", action: copySecret)
+            faceBtn(revealed ? "hide" : "reveal") { revealed.toggle() }
+            Spacer(minLength: 0)
+        }
+    }
+
+    private func faceBtn(_ label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(label)
+                .font(Ink.mono)
+                .foregroundStyle(Ink.ink)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Ink.surface)
+                .overlay(Rectangle().strokeBorder(Ink.line, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func copySecret() {
+        let value = bodyText()
+        guard !value.isEmpty else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(value, forType: .string)
+        copied = true
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 1_400_000_000)
+            copied = false
         }
     }
 }

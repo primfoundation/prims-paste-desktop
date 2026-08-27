@@ -81,6 +81,10 @@ enum Selftest {
         let za = ItemMeta(id: "a", kind: .note, x: 0, y: 0, width: 1, height: 1, createdAt: Date(), updatedAt: Date(), bytes: 1, z: 1)
         let zb = ItemMeta(id: "b", kind: .note, x: 0, y: 0, width: 1, height: 1, createdAt: Date(), updatedAt: Date(), bytes: 1, z: 2)
         check("dragged card paints last", DragMath.paintOrder([za, zb], draggingID: "a").last?.id == "a")
+        check("key paste stays hidden", SecretFace.hidesPayload(looksLikeKey: true, revealed: false, shuttered: false))
+        check("prose paste shows", !SecretFace.hidesPayload(looksLikeKey: false, revealed: false, shuttered: false))
+        check("copy reveal on keys only", SecretFace.showsCopyReveal(looksLikeKey: true, shuttered: false)
+            && !SecretFace.showsCopyReveal(looksLikeKey: false, shuttered: false))
 
         let exe = URL(fileURLWithPath: CommandLine.arguments[0]).resolvingSymlinksInPath()
         let inApp = exe.path.contains(".app/Contents/MacOS/")
