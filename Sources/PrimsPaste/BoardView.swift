@@ -13,7 +13,7 @@ struct BoardView: View {
             VStack(spacing: 0) {
                 toolbar
                 bigTabs
-                HStack(spacing: 0) {
+                ZStack(alignment: .trailing) {
                     ZStack {
                         canvas
                         if board.visibleItems.isEmpty, !board.shuttered {
@@ -24,8 +24,10 @@ struct BoardView: View {
                     }
                     if board.showCalendar {
                         CalendarDrawer(board: board)
+                            .transition(.move(edge: .trailing))
                     }
                 }
+                .animation(.easeInOut(duration: 0.18), value: board.showCalendar)
             }
         }
         .coordinateSpace(name: "chrome")
@@ -67,12 +69,7 @@ struct BoardView: View {
             tool("paste ⌘V") { board.dropClipboard() }
             tool("note") { board.dropNote() }
             tool("audio") { startAudio() }
-            viewBtn("layout", .layout)
-            viewBtn("time", .timeline)
-            viewBtn("week", .week)
-            viewBtn("month", .month)
-            viewBtn("year", .year)
-            tool("calendar") { board.showCalendar.toggle(); board.poke() }
+            tool("calendar") { withAnimation(.easeInOut(duration: 0.18)) { board.showCalendar.toggle() }; board.poke() }
             tool(board.shuttered ? "uncover" : "cover") {
                 Task { await board.toggleShutter() }
             }
@@ -139,23 +136,6 @@ struct BoardView: View {
             }
         )
         .onPreferenceChange(TabFramePref.self) { board.tabFrames.merge($0, uniquingKeysWith: { $1 }) }
-    }
-
-    private func viewBtn(_ label: String, _ mode: BoardViewMode) -> some View {
-        let on = board.viewMode == mode
-        return Button {
-            board.viewMode = mode
-            board.poke()
-        } label: {
-            Text(label)
-                .font(Ink.mono)
-                .foregroundStyle(on ? Ink.accentInk : Ink.ink)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(on ? Ink.accent : Ink.surface)
-                .overlay(Rectangle().strokeBorder(on ? Ink.accent : Ink.line, lineWidth: 1))
-        }
-        .buttonStyle(.plain)
     }
 
     private func tool(_ label: String, _ action: @escaping () -> Void) -> some View {

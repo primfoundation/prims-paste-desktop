@@ -67,8 +67,11 @@ struct CalendarDrawer: View {
         }
         .padding(16)
         .frame(width: 280)
-        .background(Ink.bar)
-        .overlay(Rectangle().strokeBorder(Ink.line, lineWidth: 1))
+        .frame(maxHeight: .infinity, alignment: .top)
+        .background(Ink.raised)
+        .overlay(alignment: .leading) {
+            Rectangle().fill(Ink.line).frame(width: 1)
+        }
     }
 
     private func spanBtn(_ label: String, _ span: DateSpan) -> some View {

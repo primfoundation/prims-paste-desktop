@@ -77,9 +77,6 @@ struct UnlockView: View {
                 Text("Prims Paste")
                     .font(Ink.display)
                     .foregroundStyle(Ink.ink)
-                Text("Touch ID to open. That's the only gate.")
-                    .font(Ink.mono)
-                    .foregroundStyle(Ink.mute)
                 Button("Touch ID") {
                     Task { await board.unlock() }
                 }
