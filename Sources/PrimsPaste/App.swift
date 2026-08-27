@@ -71,6 +71,14 @@ struct UnlockView: View {
         ZStack {
             Ink.board
             VStack(spacing: 18) {
+                if let mark = NSImage(named: "PasteMark") {
+                    Image(nsImage: mark)
+                        .resizable()
+                        .interpolation(.high)
+                        .aspectRatio(contentMode: .fit)
+                        .frame(height: 88)
+                        .padding(.bottom, 6)
+                }
                 Text("Prims Paste")
                     .font(.system(size: 34, weight: .regular, design: .serif))
                     .foregroundStyle(Ink.ink)

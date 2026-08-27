@@ -29,6 +29,9 @@ cp "$BIN" "$APP/Contents/MacOS/PrimsPaste"
 cp "$CLI" "$APP/Contents/Helpers/prims-paste"
 chmod 755 "$APP/Contents/MacOS/PrimsPaste" "$APP/Contents/Helpers/prims-paste"
 cp "$PKG/Info.plist" "$APP/Contents/Info.plist"
+test -f "$PKG/brand/AppIcon.icns" || { echo "FATAL: brand/AppIcon.icns missing — run scripts/render-brand.py" >&2; exit 1; }
+cp "$PKG/brand/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
+cp "$PKG/brand/mark-paste.png" "$APP/Contents/Resources/PasteMark.png"
 echo -n "APPL????" > "$APP/Contents/PkgInfo"
 
 security find-certificate -c "$ID" >/dev/null 2>&1 || {

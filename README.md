@@ -1,5 +1,9 @@
 # prims-paste-desktop
 
+<p align="center">
+  <img src="brand/lockup-paper.png" alt="Prims Paste" width="520">
+</p>
+
 GitHub: https://github.com/primfoundation/prims-paste-desktop
 
 App: `~/Applications/Prims Paste.app`  
