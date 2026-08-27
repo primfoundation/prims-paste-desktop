@@ -60,6 +60,40 @@ final class ConvertTests: XCTestCase {
     }
 
     func testTargetsAreTheOnesWeNamed() {
-        XCTAssertEqual(ConvertTarget.allCases.map(\.menuLabel), ["Docket task", "Paseo agent"])
+        XCTAssertEqual(ConvertTarget.allCases.map(\.menuLabel), ["Docket task", "Paseo agent", "Note"])
+    }
+
+    func testDocketIDFromRef() {
+        XCTAssertEqual(Convert.docketID(from: "docket:/tmp/pack#TASK-0007"), "TASK-0007")
+        XCTAssertNil(Convert.docketID(from: "paseo:agt_1"))
+    }
+
+    func testClearConversionUnlinks() throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("primspaste-test-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let store = try NotebookStore(root: dir, key: SymmetricKey(size: .bits256))
+        let meta = try store.add(
+            kind: .note,
+            plaintext: Data("keep-me".utf8),
+            at: CGPoint(x: 0, y: 0),
+            size: CGSize(width: 10, height: 10),
+            caption: "invoice follow-up"
+        )
+        _ = try store.convert(meta.id, conversion: Conversion(target: .docketTask, ref: "docket:/tmp#TASK-0001", title: "invoice follow-up"))
+        let back = try store.clearConversion(meta.id)
+        XCTAssertNil(back.conversion)
+        XCTAssertEqual(try store.readBlob(id: meta.id), Data("keep-me".utf8))
+    }
+
+    func testRevertArchivesDocketCard() throws {
+        let pack = FileManager.default.temporaryDirectory
+            .appendingPathComponent("primspaste-docket-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: pack) }
+        let live = ConvertLive(packDir: pack)
+        let conv = try live.convert(target: .docketTask, stickyID: "pp_test", caption: "invoice follow-up")
+        try live.revert(conv)
+        let lines = try String(contentsOf: pack.appendingPathComponent("tasks.jsonl"), encoding: .utf8)
+        XCTAssertTrue(lines.contains("\"archived\":true") || lines.contains("\"archived\": true"), lines)
     }
 }

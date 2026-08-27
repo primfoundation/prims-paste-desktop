@@ -28,7 +28,7 @@ public enum CLIParser {
       prims-paste tab add <title> [--color #HEX]
       prims-paste add --tab <name-or-id> --title <text> [--body <text>]
       prims-paste list [--tab <name-or-id>]
-      prims-paste convert <id> <docket|paseo>
+      prims-paste convert <id> <docket|paseo|note>
       prims-paste bugs file
       prims-paste bugs tasks
       prims-paste import-safepaste
@@ -60,7 +60,7 @@ public enum CLIParser {
             return .success(CLICommand.list(tab: flag(rest, "--tab")))
         case "convert":
             guard rest.count >= 2, let target = ConvertTarget(rawValue: rest[1]) else {
-                return .failure(CLIUsage("usage: prims-paste convert <id> <docket|paseo>"))
+                return .failure(CLIUsage("usage: prims-paste convert <id> <docket|paseo|note>"))
             }
             return .success(CLICommand.convert(id: rest[0], target: target))
         case "bugs":

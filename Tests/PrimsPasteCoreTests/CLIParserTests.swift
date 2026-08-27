@@ -24,6 +24,10 @@ final class CLIParserTests: XCTestCase {
             try CLIParser.parse(["convert", "pp_1", "paseo"]).get(),
             .convert(id: "pp_1", target: .paseoAgent)
         )
+        XCTAssertEqual(
+            try CLIParser.parse(["convert", "pp_1", "note"]).get(),
+            .convert(id: "pp_1", target: .note)
+        )
     }
 
     func testBugsVerbs() {

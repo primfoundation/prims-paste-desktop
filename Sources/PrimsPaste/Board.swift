@@ -397,6 +397,10 @@ final class Board: ObservableObject {
     func convert(_ id: String, to target: ConvertTarget) {
         poke()
         guard let store else { return }
+        if target == .note {
+            revertToNote(id)
+            return
+        }
         let caption = items.first(where: { $0.id == id })?.caption ?? ""
         Task {
             do {
@@ -406,6 +410,27 @@ final class Board: ObservableObject {
                     caption: caption
                 )
                 let meta = try store.convert(id, conversion: conv)
+                await MainActor.run {
+                    if let i = self.items.firstIndex(where: { $0.id == id }) {
+                        self.items[i] = meta
+                    }
+                }
+            } catch {
+                await MainActor.run { self.errorText = "\(error)" }
+            }
+        }
+    }
+
+    func revertToNote(_ id: String) {
+        poke()
+        guard let store else { return }
+        let conv = items.first(where: { $0.id == id })?.conversion
+        Task {
+            do {
+                if let conv {
+                    try ConvertLive.shared.revert(conv)
+                }
+                let meta = try store.clearConversion(id)
                 await MainActor.run {
                     if let i = self.items.firstIndex(where: { $0.id == id }) {
                         self.items[i] = meta

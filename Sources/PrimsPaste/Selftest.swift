@@ -68,6 +68,12 @@ enum Selftest {
             }
             return false
         }())
+        check("cli parse convert note", {
+            if case .convert(_, let t) = try? CLIParser.parse(["convert", "pp_x", "note"]).get() {
+                return t == .note
+            }
+            return false
+        }())
         check("cli parse import-safepaste", {
             if case .importSafepaste = try? CLIParser.parse(["import-safepaste"]).get() { return true }
             return false

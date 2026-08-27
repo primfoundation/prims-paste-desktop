@@ -88,6 +88,14 @@ enum PrimsPasteCLI {
             guard let item = idx.items.first(where: { $0.id == id }) else {
                 throw NotebookError.missingBlob(id)
             }
+            if target == .note {
+                if let conv = item.conversion {
+                    try ConvertLive.shared.revert(conv)
+                }
+                let meta = try store.clearConversion(id)
+                print("\(meta.id)  note")
+                return
+            }
             let conv = try ConvertLive.shared.convert(
                 target: target,
                 stickyID: id,

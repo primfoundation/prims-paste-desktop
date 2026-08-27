@@ -175,6 +175,17 @@ public final class NotebookStore: @unchecked Sendable {
         return index.items[i]
     }
 
+    public func clearConversion(_ id: String) throws -> ItemMeta {
+        var index = try loadIndex()
+        guard let i = index.items.firstIndex(where: { $0.id == id }) else {
+            throw NotebookError.missingBlob(id)
+        }
+        index.items[i].conversion = nil
+        index.items[i].updatedAt = Date()
+        try saveIndex(index)
+        return index.items[i]
+    }
+
     public func bringToFront(_ id: String) throws -> ItemMeta {
         var index = try loadIndex()
         guard let i = index.items.firstIndex(where: { $0.id == id }) else {

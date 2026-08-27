@@ -29,6 +29,24 @@ public struct ConvertLive: ConvertRunning, Sendable {
             return try createDocket(stickyID: stickyID, title: title)
         case .paseoAgent:
             return try createPaseo(stickyID: stickyID, title: title)
+        case .note:
+            throw NotebookError.convert("note is revert, not create")
+        }
+    }
+
+    /// Unlink. Docket cards are archived, not deleted.
+    public func revert(_ conv: Conversion) throws {
+        switch conv.target {
+        case .docketTask:
+            guard let id = Convert.docketID(from: conv.ref) else { return }
+            let (code, out) = try run([
+                docketBin, "task-archive", id, "--dir", packDir.path, "--json",
+            ])
+            if code != 0 {
+                throw NotebookError.convert("docket task-archive failed: \(stderrish(out))")
+            }
+        case .paseoAgent, .note:
+            break
         }
     }
 

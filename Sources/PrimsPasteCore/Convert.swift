@@ -7,6 +7,7 @@ import Foundation
 public enum ConvertTarget: String, Codable, CaseIterable, Sendable, Identifiable {
     case docketTask = "docket"
     case paseoAgent = "paseo"
+    case note = "note"
 
     public var id: String { rawValue }
 
@@ -14,6 +15,7 @@ public enum ConvertTarget: String, Codable, CaseIterable, Sendable, Identifiable
         switch self {
         case .docketTask: return "Docket task"
         case .paseoAgent: return "Paseo agent"
+        case .note: return "Note"
         }
     }
 
@@ -21,6 +23,7 @@ public enum ConvertTarget: String, Codable, CaseIterable, Sendable, Identifiable
         switch self {
         case .docketTask: return "DOCKET"
         case .paseoAgent: return "PASEO"
+        case .note: return "NOTE"
         }
     }
 }
@@ -45,6 +48,12 @@ public enum Convert {
     public static func title(from caption: String, target: ConvertTarget) -> String {
         let t = caption.trimmingCharacters(in: .whitespacesAndNewlines)
         return t.isEmpty ? target.menuLabel : t
+    }
+
+    public static func docketID(from ref: String) -> String? {
+        guard let hash = ref.split(separator: "#").last else { return nil }
+        let id = String(hash)
+        return id.hasPrefix("TASK-") ? id : nil
     }
 
     public static func docketNotes(title: String) -> String {

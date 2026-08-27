@@ -28,7 +28,9 @@ struct StickyCard<Content: View>: View {
                 Spacer()
                 Menu {
                     ForEach(ConvertTarget.allCases) { t in
-                        Button(t.menuLabel) { onConvert(t) }
+                        if t != .note || item.conversion != nil {
+                            Button(t.menuLabel) { onConvert(t) }
+                        }
                     }
                 } label: {
                     Text(item.conversion?.target.badge ?? "convert")
