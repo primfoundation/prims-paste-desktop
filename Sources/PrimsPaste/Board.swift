@@ -125,7 +125,13 @@ final class Board: ObservableObject {
     func refreshCover(windowActive: Bool? = nil) {
         let windowActive = windowActive ?? NSApp.isActive
         let idle = Date().timeIntervalSince(lastPoke)
-        let want = CoverPolicy.shouldCover(working: working, windowActive: windowActive, idleFor: idle)
+        if locked { return }
+        let want = CoverPolicy.shouldCover(
+            working: working,
+            windowActive: windowActive,
+            idleFor: idle,
+            unlocked: unlockedOnce && !locked
+        )
         if want && !shuttered {
             cache.removeAll()
             shuttered = true
@@ -176,7 +182,7 @@ final class Board: ObservableObject {
         do {
             let key = try KeychainKey.loadOrCreate()
             let store = try NotebookStore(root: Paths.defaultRoot, key: key)
-            try store.seedFeaturesWanted()
+            try? store.seedFeaturesWanted()
             self.store = store
             let idx = try store.loadIndex()
             items = idx.items
@@ -186,14 +192,16 @@ final class Board: ObservableObject {
             locked = false
             unlockedOnce = true
             shuttered = false
-            poke()
+            lastPoke = Date()
         } catch {
             errorText = "\(error)"
+            locked = false
+            unlockedOnce = true
+            shuttered = false
         }
     }
 
     func payload(_ id: String) -> Data? {
-        if shuttered { return nil }
         if let hit = cache.get(id) { return hit }
         guard let store else { return nil }
         do {
@@ -246,6 +254,7 @@ final class Board: ObservableObject {
 
     func dropImage(_ data: Data, at point: CGPoint? = nil) {
         poke()
+        guard !data.isEmpty else { return }
         add(
             .image,
             data,
@@ -292,6 +301,8 @@ final class Board: ObservableObject {
             items.append(meta)
             selectedID = meta.id
             return meta
+        } catch NotebookError.emptyPayload {
+            return nil
         } catch {
             errorText = "\(error)"
             return nil
@@ -431,12 +442,15 @@ final class Board: ObservableObject {
     private func writeNote(_ id: String, text: String) {
         guard let store else { return }
         let data = Data(text.utf8)
+        guard !data.isEmpty else { return }
         do {
             let meta = try store.updatePayload(id, plaintext: data)
             cache.set(id, data)
             if let i = items.firstIndex(where: { $0.id == id }) {
                 items[i] = meta
             }
+        } catch NotebookError.emptyPayload {
+            return
         } catch {
             errorText = "\(error)"
         }
@@ -479,7 +493,7 @@ final class Board: ObservableObject {
 
     private func imageFromPasteboard() -> Data? {
         let pb = NSPasteboard.general
-        if let png = pb.data(forType: .png) { return png }
+        if let png = pb.data(forType: .png), !png.isEmpty { return png }
         if let tiff = pb.data(forType: .tiff),
            let img = NSImage(data: tiff),
            let tiffRep = img.tiffRepresentation,

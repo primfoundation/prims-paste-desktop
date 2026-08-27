@@ -227,8 +227,10 @@ public final class NotebookStore: @unchecked Sendable {
         var y: Double = 40
         for f in FeaturesWanted.all {
             if index.items.contains(where: { $0.id == f.stickyID }) { continue }
+            let body = Data(f.body.utf8)
+            guard !body.isEmpty else { continue }
             let now = Date()
-            try writeBlob(id: f.stickyID, plaintext: Data(f.body.utf8))
+            try writeBlob(id: f.stickyID, plaintext: body)
             index.items.append(
                 ItemMeta(
                     id: f.stickyID,

@@ -35,10 +35,19 @@ public struct ChatSettings: Codable, Equatable, Sendable {
 public enum CoverPolicy {
     public static let idleSeconds: TimeInterval = 45
 
-    /// Cover only when you are not working.
-    public static func shouldCover(working: Bool, windowActive: Bool, idleFor: TimeInterval) -> Bool {
+    public static let resignGrace: TimeInterval = 2
+
+    /// Cover only when you are not working. Touch ID / switching apps
+    /// must not black the board the instant the window resigns.
+    public static func shouldCover(
+        working: Bool,
+        windowActive: Bool,
+        idleFor: TimeInterval,
+        unlocked: Bool = true
+    ) -> Bool {
+        if !unlocked { return false }
         if working { return false }
-        if !windowActive { return true }
+        if !windowActive { return idleFor >= resignGrace }
         return idleFor >= idleSeconds
     }
 }

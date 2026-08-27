@@ -64,6 +64,8 @@ enum Selftest {
         check("features list count", FeaturesWanted.all.count == 26)
         check("convert uses caption not payload", Convert.title(from: "file the invoice", target: .docketTask) == "file the invoice" && !Convert.usesPayload())
         check("cover while working is off", CoverPolicy.shouldCover(working: true, windowActive: false, idleFor: 99) == false)
+        check("cover not on instant resign", CoverPolicy.shouldCover(working: false, windowActive: false, idleFor: 0) == false)
+        check("cover not before unlock", CoverPolicy.shouldCover(working: false, windowActive: false, idleFor: 99, unlocked: false) == false)
         check("online chat rejected", ChatSettings(engine: "ollama", endpoint: "https://api.openai.com", model: "x", modelPath: "").rejectedBecauseOnline)
         check("drag persists only on end", DragMath.shouldPersist(ended: true) && !DragMath.shouldPersist(ended: false))
         let za = ItemMeta(id: "a", kind: .note, x: 0, y: 0, width: 1, height: 1, createdAt: Date(), updatedAt: Date(), bytes: 1, z: 1)

@@ -124,9 +124,12 @@ final class TabDragCoverTests: XCTestCase {
     func testCoverOnlyWhenNotWorking() {
         XCTAssertFalse(CoverPolicy.shouldCover(working: true, windowActive: true, idleFor: 999))
         XCTAssertFalse(CoverPolicy.shouldCover(working: true, windowActive: false, idleFor: 999))
-        XCTAssertTrue(CoverPolicy.shouldCover(working: false, windowActive: false, idleFor: 0))
+        XCTAssertFalse(CoverPolicy.shouldCover(working: false, windowActive: false, idleFor: 0))
+        XCTAssertFalse(CoverPolicy.shouldCover(working: false, windowActive: false, idleFor: 1))
+        XCTAssertTrue(CoverPolicy.shouldCover(working: false, windowActive: false, idleFor: 2))
         XCTAssertFalse(CoverPolicy.shouldCover(working: false, windowActive: true, idleFor: 10))
         XCTAssertTrue(CoverPolicy.shouldCover(working: false, windowActive: true, idleFor: 45))
+        XCTAssertFalse(CoverPolicy.shouldCover(working: false, windowActive: false, idleFor: 99, unlocked: false))
     }
 
     func testOldItemGetsTabIDFromDay() throws {
