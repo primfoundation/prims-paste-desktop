@@ -8,7 +8,7 @@ struct CalendarDrawer: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
                 Text("Calendar")
-                    .font(Ink.serif)
+                    .font(Ink.title)
                 Spacer()
                 Button("close") {
                     board.showCalendar = false
@@ -31,14 +31,14 @@ struct CalendarDrawer: View {
 
             HStack {
                 Button("‹") { board.shiftCalendar(-1) }
-                    .font(Ink.serif)
+                    .font(Ink.title)
                     .buttonStyle(.plain)
                 Spacer()
                 Text(board.calendarLabel)
                     .font(Ink.mono)
                 Spacer()
                 Button("›") { board.shiftCalendar(1) }
-                    .font(Ink.serif)
+                    .font(Ink.title)
                     .buttonStyle(.plain)
             }
 
@@ -68,7 +68,7 @@ struct CalendarDrawer: View {
         .padding(16)
         .frame(width: 280)
         .background(Ink.bar)
-        .overlay(Rectangle().strokeBorder(Color.black.opacity(0.08), lineWidth: 1))
+        .overlay(Rectangle().strokeBorder(Ink.line, lineWidth: 1))
     }
 
     private func spanBtn(_ label: String, _ span: DateSpan) -> some View {
@@ -77,10 +77,11 @@ struct CalendarDrawer: View {
             board.calendarSpan = span
             board.poke()
         }
-        .font(.system(size: 16, weight: .semibold, design: .monospaced))
+        .font(Ink.mono)
         .frame(maxWidth: .infinity, minHeight: 40)
-        .background(on ? Ink.tabOn : Color.black.opacity(0.06))
-        .foregroundStyle(on ? Color.white : Ink.ink)
+        .background(on ? Ink.accent : Ink.surface)
+        .foregroundStyle(on ? Ink.accentInk : Ink.ink)
+        .overlay(Rectangle().strokeBorder(on ? Ink.accent : Ink.line, lineWidth: 1))
         .buttonStyle(.plain)
     }
 
@@ -92,12 +93,13 @@ struct CalendarDrawer: View {
         } label: {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(Ink.body)
-                Text(hint).font(Ink.small).foregroundStyle(on ? Color.white.opacity(0.8) : Ink.mute)
+                Text(hint).font(Ink.small).foregroundStyle(on ? Ink.accentInk.opacity(0.7) : Ink.mute)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(8)
-            .background(on ? Ink.tabOn : Color.black.opacity(0.04))
-            .foregroundStyle(on ? Color.white : Ink.ink)
+            .background(on ? Ink.accent : Ink.surface)
+            .foregroundStyle(on ? Ink.accentInk : Ink.ink)
+            .overlay(Rectangle().strokeBorder(on ? Ink.accent : Ink.line, lineWidth: 1))
         }
         .buttonStyle(.plain)
     }

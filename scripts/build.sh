@@ -32,6 +32,8 @@ cp "$PKG/Info.plist" "$APP/Contents/Info.plist"
 test -f "$PKG/brand/AppIcon.icns" || { echo "FATAL: brand/AppIcon.icns missing — run scripts/render-brand.py" >&2; exit 1; }
 cp "$PKG/brand/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
 cp "$PKG/brand/mark-paste.png" "$APP/Contents/Resources/PasteMark.png"
+mkdir -p "$APP/Contents/Resources/Fonts"
+cp "$PKG/brand/fonts/"*.ttf "$APP/Contents/Resources/Fonts/"
 echo -n "APPL????" > "$APP/Contents/PkgInfo"
 
 security find-certificate -c "$ID" >/dev/null 2>&1 || {

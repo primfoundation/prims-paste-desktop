@@ -7,7 +7,7 @@ struct SettingsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Local chat")
-                .font(Ink.serif)
+                .font(Ink.title)
             Text("Notes stay on this Mac. No cloud models.")
                 .font(Ink.small)
                 .foregroundStyle(Ink.mute)
@@ -51,7 +51,7 @@ struct NewTabSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("New tab")
-                .font(Ink.serif)
+                .font(Ink.title)
             TextField("name", text: $board.newTabTitle)
                 .textFieldStyle(.roundedBorder)
             ColorPicker("color", selection: $board.newTabColor, supportsOpacity: false)

@@ -37,7 +37,7 @@ struct StickyCard<Content: View>: View {
                 .menuStyle(.borderlessButton)
                 Button(action: onDelete) {
                     Text("×")
-                        .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                        .font(Ink.mono)
                         .foregroundStyle(Ink.mute)
                 }
                 .buttonStyle(.plain)
@@ -71,10 +71,12 @@ struct StickyCard<Content: View>: View {
         .padding(12)
         .frame(width: item.width, height: item.height, alignment: .topLeading)
         .background(Ink.paper(for: item))
-        .shadow(
-            color: .black.opacity(dragging ? 0.35 : selected ? 0.22 : 0.14),
-            radius: dragging ? 16 : 6,
-            y: dragging ? 8 : 3
+        .overlay(
+            Rectangle()
+                .strokeBorder(
+                    dragging ? Ink.accent : selected ? Ink.ink : Ink.line,
+                    lineWidth: dragging || selected ? 1.5 : 1
+                )
         )
         .rotationEffect(.degrees(dragging ? 0 : item.tilt * 0.35))
         .scaleEffect(dragging ? 1.05 : 1)

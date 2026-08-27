@@ -1,33 +1,49 @@
 import SwiftUI
 import PrimsPasteCore
 
+/// prim.brand paper palette (`tokens/dtcg.json`). Do not invent hex.
 enum Ink {
-    static let board = Color(red: 0.89, green: 0.88, blue: 0.84)
-    static let grid = Color(red: 0.62, green: 0.60, blue: 0.56).opacity(0.45)
-    static let bar = Color(red: 0.97, green: 0.97, blue: 0.95)
-    static let ink = Color(red: 0.18, green: 0.16, blue: 0.12)
-    static let mute = Color(red: 0.45, green: 0.42, blue: 0.36)
-    static let tabOn = Color(red: 0.16, green: 0.15, blue: 0.12)
+    static let board = Color(hex: "#f4f3ef")
+    static let surface = Color(hex: "#e8e7e3")
+    static let raised = Color(hex: "#fafaf8")
+    static let ink = Color(hex: "#0c0c0e")
+    static let mute = Color(hex: "#6a6a66")
+    static let subtle = Color(hex: "#9a9a96")
+    static let line = Color(hex: "#d4d3cf")
+    static let accent = Color(hex: "#e8c547")
+    static let accentInk = Color(hex: "#0c0c0e")
+    static let inkBg = Color(hex: "#0c0c0e")
+    static let cream = Color(hex: "#f4f3ef")
+
+    static let bar = raised
+    static let grid = line
+    static let tabOn = ink
+    /// Functional, not a brand token — keys are not Prim gold.
     static let keyTape = Color(red: 0.72, green: 0.18, blue: 0.14)
-    static let listen = Color(red: 0.82, green: 0.22, blue: 0.18)
+    static let listen = accent
+    static let radius: CGFloat = 2
 
-    static let serif = Font.system(.title3, design: .serif)
-    static let body = Font.system(size: 15, weight: .regular, design: .serif)
-    static let mono = Font.system(size: 11, weight: .medium, design: .monospaced)
-    static let small = Font.system(size: 10, weight: .regular, design: .monospaced)
+    static let display = Font.custom("Instrument Sans", size: 32).weight(.semibold)
+    static let title = Font.custom("Instrument Sans", size: 18).weight(.medium)
+    static let serif = title
+    static let body = Font.custom("Instrument Sans", size: 15)
+    static let tab = Font.custom("Instrument Sans", size: 17).weight(.medium)
+    static let mono = Font.custom("IBM Plex Mono", size: 11)
+    static let small = Font.custom("IBM Plex Mono", size: 10)
 
+    /// Quiet paper chips — still stickies, sitting on Prim paper.
     static let papers: [Color] = [
-        Color(red: 0.99, green: 0.93, blue: 0.52),
-        Color(red: 0.79, green: 0.93, blue: 0.72),
-        Color(red: 0.99, green: 0.78, blue: 0.72),
-        Color(red: 0.72, green: 0.86, blue: 0.96),
-        Color(red: 0.98, green: 0.84, blue: 0.62),
-        Color(red: 0.90, green: 0.80, blue: 0.96),
+        Color(hex: "#efe6c4"),
+        Color(hex: "#dce6d2"),
+        Color(hex: "#ead9d4"),
+        Color(hex: "#d9e1e6"),
+        Color(hex: "#eadcc0"),
+        Color(hex: "#e4dce6"),
     ]
 
     static func paper(for item: ItemMeta) -> Color {
         if item.looksLikeKey {
-            return Color(red: 0.98, green: 0.86, blue: 0.52)
+            return Color(hex: "#e6d48a")
         }
         let h = item.id.unicodeScalars.reduce(0) { $0 &+ Int($1.value) }
         return papers[abs(h) % papers.count]

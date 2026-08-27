@@ -58,8 +58,10 @@ struct BoardView: View {
 
     private var toolbar: some View {
         HStack(spacing: 12) {
+            FolioMark(fill: Ink.ink)
+                .frame(width: 22, height: 22)
             Text("Prims Paste")
-                .font(Ink.serif)
+                .font(Ink.title)
                 .foregroundStyle(Ink.ink)
             Spacer()
             tool("paste ⌘V") { board.dropClipboard() }
@@ -94,10 +96,11 @@ struct BoardView: View {
                     board.poke()
                 } label: {
                     Text("+")
-                        .font(.system(size: 28, weight: .medium, design: .serif))
+                        .font(Ink.title)
                         .frame(minWidth: 64, minHeight: 56)
-                        .background(Color.black.opacity(0.06))
+                        .background(Ink.surface)
                         .foregroundStyle(Ink.ink)
+                        .overlay(Rectangle().strokeBorder(Ink.line, lineWidth: 1))
                 }
                 .buttonStyle(.plain)
             }
@@ -116,14 +119,14 @@ struct BoardView: View {
             board.poke()
         } label: {
             Text(tab.title)
-                .font(.system(size: 18, weight: on ? .semibold : .regular, design: .serif))
+                .font(on ? Ink.tab.weight(.semibold) : Ink.tab)
                 .padding(.horizontal, 22)
                 .frame(minWidth: 140, minHeight: 56)
                 .background(Color(hex: tab.colorHex).opacity(on || hot ? 1 : 0.55))
-                .foregroundStyle(on || hot ? Color.white : Ink.ink)
+                .foregroundStyle(on || hot ? Ink.cream : Ink.ink)
                 .overlay(
                     Rectangle()
-                        .strokeBorder(hot ? Ink.listen : Color.clear, lineWidth: 3)
+                        .strokeBorder(hot ? Ink.accent : Color.clear, lineWidth: 2)
                 )
         }
         .buttonStyle(.plain)
@@ -146,10 +149,11 @@ struct BoardView: View {
         } label: {
             Text(label)
                 .font(Ink.mono)
-                .foregroundStyle(on ? Color.white : Ink.ink)
+                .foregroundStyle(on ? Ink.accentInk : Ink.ink)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
-                .background(on ? Ink.tabOn : Color.black.opacity(0.06))
+                .background(on ? Ink.accent : Ink.surface)
+                .overlay(Rectangle().strokeBorder(on ? Ink.accent : Ink.line, lineWidth: 1))
         }
         .buttonStyle(.plain)
     }
@@ -161,7 +165,8 @@ struct BoardView: View {
                 .foregroundStyle(Ink.ink)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
-                .background(Color.black.opacity(0.06))
+                .background(Ink.surface)
+                .overlay(Rectangle().strokeBorder(Ink.line, lineWidth: 1))
         }
         .buttonStyle(.plain)
     }
@@ -183,7 +188,7 @@ struct BoardView: View {
     private var emptyHint: some View {
         VStack(spacing: 8) {
             Text(board.selectedTab?.title ?? "this tab")
-                .font(Ink.serif)
+                .font(Ink.title)
                 .foregroundStyle(Ink.ink)
             Text("drop anywhere  ·  drag a sticky onto a tab to tag it")
                 .font(Ink.mono)
@@ -194,17 +199,22 @@ struct BoardView: View {
 
     private var shutter: some View {
         ZStack {
-            Color(red: 0.12, green: 0.11, blue: 0.09).opacity(0.88)
+            Ink.inkBg.opacity(0.96)
             VStack(spacing: 12) {
+                FolioMark(fill: Ink.accent)
+                    .frame(width: 36, height: 36)
                 Text("covered")
-                    .font(Ink.serif)
-                    .foregroundStyle(Color.white)
+                    .font(Ink.title)
+                    .foregroundStyle(Ink.cream)
                 Text("idle")
                     .font(Ink.mono)
-                    .foregroundStyle(Color.white.opacity(0.7))
+                    .foregroundStyle(Ink.subtle)
                 Button("uncover") { Task { await board.toggleShutter() } }
                     .font(Ink.mono)
-                    .foregroundStyle(Color.white)
+                    .foregroundStyle(Ink.accentInk)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Ink.accent)
             }
         }
     }
@@ -411,7 +421,7 @@ struct BoardView: View {
 
     private var pasteSheet: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Drop a paste").font(Ink.serif)
+            Text("Drop a paste").font(Ink.title)
             SecureField("secret", text: $board.typedPaste)
                 .textFieldStyle(.roundedBorder)
                 .frame(width: 360)

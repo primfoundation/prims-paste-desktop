@@ -71,16 +71,11 @@ struct UnlockView: View {
         ZStack {
             Ink.board
             VStack(spacing: 18) {
-                if let mark = NSImage(named: "PasteMark") {
-                    Image(nsImage: mark)
-                        .resizable()
-                        .interpolation(.high)
-                        .aspectRatio(contentMode: .fit)
-                        .frame(height: 88)
-                        .padding(.bottom, 6)
-                }
+                FolioMark(fill: Ink.ink)
+                    .frame(width: 72, height: 72)
+                    .padding(.bottom, 6)
                 Text("Prims Paste")
-                    .font(.system(size: 34, weight: .regular, design: .serif))
+                    .font(Ink.display)
                     .foregroundStyle(Ink.ink)
                 Text("Touch ID to open. That's the only gate.")
                     .font(Ink.mono)
@@ -90,6 +85,11 @@ struct UnlockView: View {
                 }
                 .keyboardShortcut(.defaultAction)
                 .font(Ink.mono)
+                .buttonStyle(.plain)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(Ink.accent)
+                .foregroundStyle(Ink.accentInk)
                 if let err = board.errorText {
                     Text(err).font(Ink.small).foregroundStyle(Ink.keyTape)
                 }
