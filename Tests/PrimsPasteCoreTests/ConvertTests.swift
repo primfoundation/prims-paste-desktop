@@ -86,6 +86,35 @@ final class ConvertTests: XCTestCase {
         XCTAssertEqual(try store.readBlob(id: meta.id), Data("keep-me".utf8))
     }
 
+    func testDocketCardDecodesKebabFields() throws {
+        let json = """
+        {"id":"TASK-0001","title":"Ship login","status":"To Do","notes":"A real brief lives here. Second sentence for the floor.","requirements":["Keep the sticky linked.","Do not copy secrets."],"test-cases":["Editor opens."],"acceptance-criteria":["Ref points at this card.","Title matches caption."]}
+        """.data(using: .utf8)!
+        let card = try JSONDecoder().decode(DocketCard.self, from: json)
+        XCTAssertEqual(card.id, "TASK-0001")
+        XCTAssertEqual(card.testCases, ["Editor opens."])
+        XCTAssertEqual(card.acceptance.count, 2)
+    }
+
+    func testViewAndSaveTaskNeverSeePayload() throws {
+        var seen: [[String]] = []
+        let json = #"{"id":"TASK-0009","title":"Ship login","status":"To Do","notes":"Brief one. Brief two for length and a second sentence.","requirements":["Keep the sticky linked to this card.","Do not copy secret payloads from the sticky."],"test-cases":["The editor opens."],"acceptance-criteria":["conversion.ref points at this docket card.","The docket title matches the sticky caption."]}"#
+        let live = ConvertLive(packDir: URL(fileURLWithPath: "/tmp/pp-docket")) { argv in
+            seen.append(argv)
+            return (0, Data(json.utf8))
+        }
+        let card = try live.viewTask(id: "TASK-0009")
+        XCTAssertEqual(card.id, "TASK-0009")
+        var draft = card
+        draft.title = "Ship login for real"
+        try live.saveTask(draft)
+        let flat = seen.flatMap { $0 }.joined(separator: " ")
+        XCTAssertFalse(flat.contains("sk-live"))
+        XCTAssertFalse(flat.contains("do-not-send"))
+        XCTAssertTrue(flat.contains("task-edit"))
+        XCTAssertTrue(flat.contains("Ship login for real"))
+    }
+
     func testRevertArchivesDocketCard() throws {
         let pack = FileManager.default.temporaryDirectory
             .appendingPathComponent("primspaste-docket-\(UUID().uuidString)")

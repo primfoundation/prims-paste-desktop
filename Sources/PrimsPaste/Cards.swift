@@ -14,6 +14,7 @@ struct StickyCard<Content: View>: View {
     let onDragChanged: (CGSize, CGPoint) -> Void
     let onDragEnded: () -> Void
     let onConvert: (ConvertTarget) -> Void
+    let onOpen: () -> Void
     @ViewBuilder var content: () -> Content
 
     var body: some View {
@@ -45,6 +46,8 @@ struct StickyCard<Content: View>: View {
                 }
                 .buttonStyle(.plain)
             }
+            .contentShape(Rectangle())
+            .onTapGesture(count: 2, perform: onOpen)
 
             if let conv = item.conversion {
                 Text("\(conv.target.badge)  \(conv.title)")
@@ -85,8 +88,9 @@ struct StickyCard<Content: View>: View {
         .scaleEffect(dragging ? 1.05 : 1)
         .offset(x: item.x + lift.width, y: item.y + lift.height)
         .zIndex(dragging ? 10_000 : Double(item.z))
-        .onTapGesture { onSelect() }
-        .highPriorityGesture(drag)
+        .onTapGesture(count: 2, perform: onOpen)
+        .onTapGesture(count: 1, perform: onSelect)
+        .gesture(drag)
     }
 
     private var drag: some Gesture {
@@ -113,13 +117,14 @@ struct PasteSticky: View {
     let onDragChanged: (CGSize, CGPoint) -> Void
     let onDragEnded: () -> Void
     let onConvert: (ConvertTarget) -> Void
+    let onOpen: () -> Void
     @State private var revealed = false
     @State private var copied = false
 
     var body: some View {
         StickyCard(
             item: item, selected: selected, listening: listening, dragging: dragging, lift: lift,
-            onSelect: onSelect, onDelete: onDelete, onDragBegin: onDragBegin, onDragChanged: onDragChanged, onDragEnded: onDragEnded, onConvert: onConvert
+            onSelect: onSelect, onDelete: onDelete, onDragBegin: onDragBegin, onDragChanged: onDragChanged, onDragEnded: onDragEnded, onConvert: onConvert, onOpen: onOpen
         ) {
             if shuttered {
                 Text("covered").font(Ink.small).foregroundStyle(Ink.mute)
@@ -194,12 +199,13 @@ struct NoteSticky: View {
     let onDragChanged: (CGSize, CGPoint) -> Void
     let onDragEnded: () -> Void
     let onConvert: (ConvertTarget) -> Void
+    let onOpen: () -> Void
     let onSave: (String) -> Void
 
     var body: some View {
         StickyCard(
             item: item, selected: selected, listening: false, dragging: dragging, lift: lift,
-            onSelect: onSelect, onDelete: onDelete, onDragBegin: onDragBegin, onDragChanged: onDragChanged, onDragEnded: onDragEnded, onConvert: onConvert
+            onSelect: onSelect, onDelete: onDelete, onDragBegin: onDragBegin, onDragChanged: onDragChanged, onDragEnded: onDragEnded, onConvert: onConvert, onOpen: onOpen
         ) {
             TextEditor(text: $text)
                 .font(Ink.body)
@@ -224,6 +230,7 @@ struct AudioSticky: View {
     let onDragChanged: (CGSize, CGPoint) -> Void
     let onDragEnded: () -> Void
     let onConvert: (ConvertTarget) -> Void
+    let onOpen: () -> Void
     let onRecord: () -> Void
     let onStopRecord: () -> Void
     let onPlay: () -> Void
@@ -232,7 +239,7 @@ struct AudioSticky: View {
     var body: some View {
         StickyCard(
             item: item, selected: selected, listening: recording, dragging: dragging, lift: lift,
-            onSelect: onSelect, onDelete: onDelete, onDragBegin: onDragBegin, onDragChanged: onDragChanged, onDragEnded: onDragEnded, onConvert: onConvert
+            onSelect: onSelect, onDelete: onDelete, onDragBegin: onDragBegin, onDragChanged: onDragChanged, onDragEnded: onDragEnded, onConvert: onConvert, onOpen: onOpen
         ) {
             HStack(spacing: 8) {
                 Button(recording ? "stop" : "rec", action: recording ? onStopRecord : onRecord)
@@ -258,11 +265,12 @@ struct ImageSticky: View {
     let onDragChanged: (CGSize, CGPoint) -> Void
     let onDragEnded: () -> Void
     let onConvert: (ConvertTarget) -> Void
+    let onOpen: () -> Void
 
     var body: some View {
         StickyCard(
             item: item, selected: selected, listening: false, dragging: dragging, lift: lift,
-            onSelect: onSelect, onDelete: onDelete, onDragBegin: onDragBegin, onDragChanged: onDragChanged, onDragEnded: onDragEnded, onConvert: onConvert
+            onSelect: onSelect, onDelete: onDelete, onDragBegin: onDragBegin, onDragChanged: onDragChanged, onDragEnded: onDragEnded, onConvert: onConvert, onOpen: onOpen
         ) {
             if let data = imageData(), let ns = NSImage(data: data) {
                 Image(nsImage: ns)

@@ -34,6 +34,53 @@ public struct ConvertLive: ConvertRunning, Sendable {
         }
     }
 
+    public func viewTask(id: String) throws -> DocketCard {
+        let (code, out) = try run([
+            docketBin, "task-view", id, "--dir", packDir.path, "--json",
+        ])
+        if code != 0 {
+            throw NotebookError.convert("docket task-view failed: \(stderrish(out))")
+        }
+        guard let data = lastJSON(out) else {
+            throw NotebookError.convert("docket task-view returned no json")
+        }
+        do {
+            return try JSONDecoder().decode(DocketCard.self, from: data)
+        } catch {
+            throw NotebookError.convert("docket task-view decode: \(error)")
+        }
+    }
+
+    public func saveTask(_ card: DocketCard) throws {
+        var argv = [
+            docketBin, "task-edit", card.id, "--dir", packDir.path, "--json",
+            "--title", card.title,
+            "--status", card.status,
+            "--notes", card.notes,
+        ]
+        argv += ["--priority", card.priority ?? ""]
+        argv += ["--due", card.due ?? ""]
+        argv += ["--blocked", card.blockedReason ?? ""]
+        let req = card.requirements.isEmpty ? ["Keep the brief honest.", "Name the work."] : card.requirements
+        let accept = card.acceptance.isEmpty ? ["A stranger can mark it done.", "The sticky still cites this card."] : card.acceptance
+        let cases = card.testCases.isEmpty ? ["Open the editor and the fields persist."] : card.testCases
+        for r in req { argv += ["--req", r] }
+        for c in cases { argv += ["--case", c] }
+        for a in accept { argv += ["--accept", a] }
+        let (code, out) = try run(argv)
+        if code != 0 {
+            throw NotebookError.convert("docket task-edit failed: \(stderrish(out))")
+        }
+    }
+
+    func lastJSON(_ data: Data) -> Data? {
+        guard let s = String(data: data, encoding: .utf8) else { return nil }
+        if let start = s.lastIndex(of: "{") {
+            return String(s[start...]).data(using: .utf8)
+        }
+        return data
+    }
+
     /// Unlink. Docket cards are archived, not deleted.
     public func revert(_ conv: Conversion) throws {
         switch conv.target {

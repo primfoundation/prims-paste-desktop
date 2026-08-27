@@ -36,6 +36,9 @@ struct BoardView: View {
         .sheet(isPresented: $board.pasteSheet) { pasteSheet }
         .sheet(isPresented: $board.showSettings) { SettingsView(board: board) }
         .sheet(isPresented: $board.showNewTab) { NewTabSheet(board: board) }
+        .sheet(item: $board.taskSession) { session in
+            TaskEditor(board: board, stickyID: session.stickyID, card: session.card)
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in
             board.refreshCover(windowActive: false)
         }
@@ -287,6 +290,7 @@ struct BoardView: View {
         let changed: (CGSize, CGPoint) -> Void = { board.updateDrag(translation: $0, location: $1) }
         let ended = { board.endDrag() }
         let convert: (ConvertTarget) -> Void = { board.convert(item.id, to: $0) }
+        let open = { board.openTaskEditor(item.id) }
         switch item.kind {
         case .paste:
             PasteSticky(
@@ -302,7 +306,8 @@ struct BoardView: View {
                 onDragBegin: begin,
                 onDragChanged: changed,
                 onDragEnded: ended,
-                onConvert: convert
+                onConvert: convert,
+                onOpen: open
             )
         case .note:
             NoteSticky(
@@ -317,6 +322,7 @@ struct BoardView: View {
                 onDragChanged: changed,
                 onDragEnded: ended,
                 onConvert: convert,
+                onOpen: open,
                 onSave: { board.saveNote(item.id, text: $0) }
             )
         case .audio:
@@ -337,6 +343,7 @@ struct BoardView: View {
                 onDragChanged: changed,
                 onDragEnded: ended,
                 onConvert: convert,
+                onOpen: open,
                 onRecord: { record(item) },
                 onStopRecord: { stopRecord(item) },
                 onPlay: { play(item) },
@@ -354,7 +361,8 @@ struct BoardView: View {
                 onDragBegin: begin,
                 onDragChanged: changed,
                 onDragEnded: ended,
-                onConvert: convert
+                onConvert: convert,
+                onOpen: open
             )
         }
     }

@@ -30,6 +30,13 @@ final class Board: ObservableObject {
     @Published var viewMode: BoardViewMode = .layout
     @Published var newTabTitle = ""
     @Published var newTabColor = Color(red: 0.77, green: 0.36, blue: 0.15)
+    @Published var taskSession: TaskSession?
+
+    struct TaskSession: Identifiable {
+        var stickyID: String
+        var card: DocketCard
+        var id: String { stickyID }
+    }
 
     let cache = BlobCache(cap: 8)
     let voice = VoiceAsk()
@@ -395,51 +402,90 @@ final class Board: ObservableObject {
     }
 
     func convert(_ id: String, to target: ConvertTarget) {
-        poke()
-        guard let store else { return }
-        if target == .note {
-            revertToNote(id)
-            return
-        }
-        let caption = items.first(where: { $0.id == id })?.caption ?? ""
         Task {
             do {
-                let conv = try ConvertLive.shared.convert(
-                    target: target,
-                    stickyID: id,
-                    caption: caption
-                )
-                let meta = try store.convert(id, conversion: conv)
-                await MainActor.run {
-                    if let i = self.items.firstIndex(where: { $0.id == id }) {
-                        self.items[i] = meta
-                    }
-                }
+                _ = try await convertNow(id, to: target)
             } catch {
-                await MainActor.run { self.errorText = "\(error)" }
+                errorText = "\(error)"
             }
         }
     }
 
-    func revertToNote(_ id: String) {
+    func convertNow(_ id: String, to target: ConvertTarget) async throws -> ItemMeta {
         poke()
-        guard let store else { return }
-        let conv = items.first(where: { $0.id == id })?.conversion
+        guard let store else { throw NotebookError.convert("store closed") }
+        if target == .note {
+            if let conv = items.first(where: { $0.id == id })?.conversion {
+                try ConvertLive.shared.revert(conv)
+            }
+            let meta = try store.clearConversion(id)
+            if let i = items.firstIndex(where: { $0.id == id }) {
+                items[i] = meta
+            }
+            return meta
+        }
+        let caption = items.first(where: { $0.id == id })?.caption ?? ""
+        let conv = try ConvertLive.shared.convert(
+            target: target,
+            stickyID: id,
+            caption: caption
+        )
+        let meta = try store.convert(id, conversion: conv)
+        if let i = items.firstIndex(where: { $0.id == id }) {
+            items[i] = meta
+        }
+        return meta
+    }
+
+    func openTaskEditor(_ id: String) {
+        poke()
         Task {
             do {
-                if let conv {
-                    try ConvertLive.shared.revert(conv)
+                var item = items.first(where: { $0.id == id })
+                if item?.conversion?.target != .docketTask {
+                    item = try await convertNow(id, to: .docketTask)
                 }
-                let meta = try store.clearConversion(id)
-                await MainActor.run {
-                    if let i = self.items.firstIndex(where: { $0.id == id }) {
-                        self.items[i] = meta
-                    }
+                guard let item, let tid = Convert.docketID(from: item.conversion?.ref ?? "") else {
+                    throw NotebookError.convert("no docket card")
                 }
+                let card = try ConvertLive.shared.viewTask(id: tid)
+                taskSession = TaskSession(stickyID: id, card: card)
             } catch {
-                await MainActor.run { self.errorText = "\(error)" }
+                errorText = "\(error)"
             }
         }
+    }
+
+    func closeTaskEditor() {
+        taskSession = nil
+        poke()
+    }
+
+    func saveTask(stickyID: String, card: DocketCard) {
+        poke()
+        do {
+            try ConvertLive.shared.saveTask(card)
+            if let store {
+                _ = try store.updateCaption(stickyID, caption: card.title)
+            }
+            if let i = items.firstIndex(where: { $0.id == stickyID }) {
+                items[i].caption = card.title
+                if var conv = items[i].conversion {
+                    conv.title = card.title
+                    items[i].conversion = conv
+                }
+            }
+            if var session = taskSession {
+                session.card = card
+                taskSession = session
+            }
+        } catch {
+            errorText = "\(error)"
+        }
+    }
+
+    func revertToNote(_ id: String) {
+        convert(id, to: .note)
     }
 
     func saveCaption(_ id: String, _ caption: String) {
