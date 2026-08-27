@@ -51,6 +51,11 @@ fi
 mkdir -p "$HOME/.local/bin"
 ln -sfn "$APP/Contents/Helpers/prims-paste" "$HOME/.local/bin/prims-paste"
 
+if ! "$APP/Contents/MacOS/PrimsPaste" --selftest; then
+  echo "selftest FAILED against installed app — not shipping" >&2
+  exit 1
+fi
+
 echo "built $APP"
 echo "signed $ID"
 echo "cli    $HOME/.local/bin/prims-paste"

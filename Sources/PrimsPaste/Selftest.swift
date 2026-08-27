@@ -78,6 +78,22 @@ enum Selftest {
         let zb = ItemMeta(id: "b", kind: .note, x: 0, y: 0, width: 1, height: 1, createdAt: Date(), updatedAt: Date(), bytes: 1, z: 2)
         check("dragged card paints last", DragMath.paintOrder([za, zb], draggingID: "a").last?.id == "a")
 
+        let exe = URL(fileURLWithPath: CommandLine.arguments[0]).resolvingSymlinksInPath()
+        let inApp = exe.path.contains(".app/Contents/MacOS/")
+        if inApp {
+            let res = exe.deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("Resources")
+            check(
+                "app icon in bundle",
+                FileManager.default.fileExists(atPath: res.appendingPathComponent("AppIcon.icns").path)
+            )
+            check(
+                "paste mark in bundle",
+                FileManager.default.fileExists(atPath: res.appendingPathComponent("PasteMark.png").path)
+            )
+        }
+
         if failed > 0 {
             print("SELFTEST FAILED (\(failed))")
             exit(1)
