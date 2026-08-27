@@ -15,3 +15,16 @@ Signed `Developer ID Application: Eidos AGI LLC (Y6CQ4SWPWM)`.
 
 Store: `~/.prims-paste/notebook/` (AES-GCM, key in login keychain).  
 Convert: Docket via `docket-prim task-create` into `~/.prims-paste/docket/`; Paseo via `paseo run`.
+
+CLI (same store as the app):
+
+```bash
+prims-paste help
+prims-paste open
+prims-paste tabs
+prims-paste add --tab bugs --title "…" --body "…"
+prims-paste list --tab bugs
+prims-paste convert <id> docket
+prims-paste bugs file
+prims-paste bugs tasks
+```

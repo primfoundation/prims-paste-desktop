@@ -7,6 +7,7 @@ let package = Package(
     products: [
         .library(name: "PrimsPasteCore", targets: ["PrimsPasteCore"]),
         .executable(name: "PrimsPaste", targets: ["PrimsPaste"]),
+        .executable(name: "prims-paste", targets: ["PrimsPasteCLI"]),
     ],
     targets: [
         .target(
@@ -27,6 +28,15 @@ let package = Package(
                 .linkedFramework("AVFoundation"),
                 .linkedFramework("LocalAuthentication"),
                 .linkedFramework("CryptoKit"),
+            ]
+        ),
+        .executableTarget(
+            name: "PrimsPasteCLI",
+            dependencies: ["PrimsPasteCore"],
+            path: "Sources/PrimsPasteCLI",
+            linkerSettings: [
+                .linkedFramework("CryptoKit"),
+                .linkedFramework("Security"),
             ]
         ),
         .testTarget(

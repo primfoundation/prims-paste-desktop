@@ -194,15 +194,58 @@ public final class NotebookStore: @unchecked Sendable {
     }
 
     public func addTab(title: String, colorHex: String) throws -> BoardTab {
-        var index = try loadIndex()
-        let tab = BoardTab(
+        try ensureTab(
             id: "tab_" + UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased(),
             title: title,
             colorHex: colorHex
         )
+    }
+
+    public func ensureTab(id: String, title: String, colorHex: String) throws -> BoardTab {
+        var index = try loadIndex()
+        if let existing = index.tabs.first(where: { $0.id == id }) {
+            return existing
+        }
+        let tab = BoardTab(id: id, title: title, colorHex: colorHex)
         index.tabs.append(tab)
         try saveIndex(index)
         return tab
+    }
+
+    public func seedBugs() throws {
+        _ = try ensureTab(id: Bugs.tabID, title: Bugs.tabTitle, colorHex: Bugs.tabColor)
+        var index = try loadIndex()
+        var x: Double = 40
+        var y: Double = 40
+        for bug in Bugs.all {
+            if index.items.contains(where: { $0.id == bug.bugStickyID }) { continue }
+            let body = Data(bug.body.utf8)
+            guard !body.isEmpty else { continue }
+            try writeBlob(id: bug.bugStickyID, plaintext: body)
+            let now = Date()
+            index.items.append(
+                ItemMeta(
+                    id: bug.bugStickyID,
+                    kind: .note,
+                    x: x,
+                    y: y,
+                    width: NotebookLayout.sticky,
+                    height: NotebookLayout.sticky,
+                    createdAt: now,
+                    updatedAt: now,
+                    bytes: bug.body.utf8.count,
+                    caption: bug.title,
+                    day: ItemMeta.today(),
+                    tabID: Bugs.tabID
+                )
+            )
+            x += 250
+            if x > 1600 {
+                x = 40
+                y += 250
+            }
+        }
+        try saveIndex(index)
     }
 
     public func saveChat(_ chat: ChatSettings) throws {

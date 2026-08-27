@@ -147,5 +147,10 @@ public enum FeaturesWanted {
             title: "Convert to…",
             body: "Button on every sticky: Docket task or Paseo agent. Convert creates the thing and the card keeps the link."
         ),
+        WantedFeature(
+            id: "cli",
+            title: "CLI control",
+            body: "prims-paste CLI talks to the same notebook: open, tabs, add, list, convert, bugs file, bugs tasks."
+        ),
     ]
 }

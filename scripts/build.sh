@@ -5,12 +5,14 @@ set -eo pipefail
 PKG="$(cd "$(dirname "$0")/.." && pwd)"
 APP="$HOME/Applications/Prims Paste.app"
 BIN="$PKG/.build/release/PrimsPaste"
+CLI="$PKG/.build/release/prims-paste"
 TEAM="Y6CQ4SWPWM"
 ID="Developer ID Application: Eidos AGI LLC ($TEAM)"
 
 cd "$PKG"
-rm -f "$BIN"
+rm -f "$BIN" "$CLI"
 swift build -c release --product PrimsPaste
+swift build -c release --product prims-paste
 
 if ! "$BIN" --selftest; then
   echo "selftest FAILED — not installing" >&2
@@ -22,9 +24,10 @@ osascript -e 'quit app "SafePaste"' 2>/dev/null || true
 pkill -f "Prims Paste.app/Contents/MacOS/PrimsPaste" 2>/dev/null || true
 sleep 0.3
 
-mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Helpers"
 cp "$BIN" "$APP/Contents/MacOS/PrimsPaste"
-chmod 755 "$APP/Contents/MacOS/PrimsPaste"
+cp "$CLI" "$APP/Contents/Helpers/prims-paste"
+chmod 755 "$APP/Contents/MacOS/PrimsPaste" "$APP/Contents/Helpers/prims-paste"
 cp "$PKG/Info.plist" "$APP/Contents/Info.plist"
 echo -n "APPL????" > "$APP/Contents/PkgInfo"
 
@@ -42,5 +45,9 @@ if [[ "$actual" != "$TEAM" ]]; then
   exit 1
 fi
 
+mkdir -p "$HOME/.local/bin"
+ln -sfn "$APP/Contents/Helpers/prims-paste" "$HOME/.local/bin/prims-paste"
+
 echo "built $APP"
 echo "signed $ID"
+echo "cli    $HOME/.local/bin/prims-paste"

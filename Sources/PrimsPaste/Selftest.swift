@@ -61,7 +61,13 @@ enum Selftest {
         )
         let parsed = WhisperCommand.parseStdout("whisper_init: x\nstripe live key")
         check("whisper parse drops logs", parsed == "stripe live key")
-        check("features list count", FeaturesWanted.all.count == 26)
+        check("features list count", FeaturesWanted.all.count == 27)
+        check("cli parse convert", {
+            if case .convert(let id, let t) = try? CLIParser.parse(["convert", "pp_x", "docket"]).get() {
+                return id == "pp_x" && t == .docketTask
+            }
+            return false
+        }())
         check("convert uses caption not payload", Convert.title(from: "file the invoice", target: .docketTask) == "file the invoice" && !Convert.usesPayload())
         check("cover while working is off", CoverPolicy.shouldCover(working: true, windowActive: false, idleFor: 99) == false)
         check("cover not on instant resign", CoverPolicy.shouldCover(working: false, windowActive: false, idleFor: 0) == false)
