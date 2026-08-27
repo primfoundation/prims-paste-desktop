@@ -68,6 +68,10 @@ enum Selftest {
             }
             return false
         }())
+        check("cli parse import-safepaste", {
+            if case .importSafepaste = try? CLIParser.parse(["import-safepaste"]).get() { return true }
+            return false
+        }())
         check("convert uses caption not payload", Convert.title(from: "file the invoice", target: .docketTask) == "file the invoice" && !Convert.usesPayload())
         check("cover while working is off", CoverPolicy.shouldCover(working: true, windowActive: false, idleFor: 99) == false)
         check("cover not on instant resign", CoverPolicy.shouldCover(working: false, windowActive: false, idleFor: 0) == false)

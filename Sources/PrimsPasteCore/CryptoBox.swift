@@ -22,6 +22,10 @@ public enum CryptoBox {
     }
 
     public static func open(blob: Data, key: SymmetricKey) throws -> Data {
+        try open(blob: blob, key: key, magic: magic)
+    }
+
+    public static func open(blob: Data, key: SymmetricKey, magic: Data) throws -> Data {
         guard blob.count > magic.count, blob.prefix(magic.count) == magic else {
             throw NotebookError.badMagic
         }

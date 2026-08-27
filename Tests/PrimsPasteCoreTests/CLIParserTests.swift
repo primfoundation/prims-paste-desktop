@@ -29,6 +29,7 @@ final class CLIParserTests: XCTestCase {
     func testBugsVerbs() {
         XCTAssertEqual(try CLIParser.parse(["bugs", "file"]).get(), .bugsFile)
         XCTAssertEqual(try CLIParser.parse(["bugs", "tasks"]).get(), .bugsTasks)
+        XCTAssertEqual(try CLIParser.parse(["import-safepaste"]).get(), .importSafepaste)
     }
 
     func testResolveTabByNameOrId() {

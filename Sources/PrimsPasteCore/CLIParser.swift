@@ -12,6 +12,7 @@ public enum CLICommand: Equatable, Sendable {
     case convert(id: String, target: ConvertTarget)
     case bugsFile
     case bugsTasks
+    case importSafepaste
 }
 
 public struct CLIUsage: Error, Equatable, Sendable {
@@ -21,7 +22,7 @@ public struct CLIUsage: Error, Equatable, Sendable {
 
 public enum CLIParser {
     public static let usage = """
-    usage: prims-paste <open|tabs|tab|add|list|convert|bugs|help> [args...]
+    usage: prims-paste <open|tabs|tab|add|list|convert|bugs|import-safepaste|help> [args...]
       prims-paste open
       prims-paste tabs
       prims-paste tab add <title> [--color #HEX]
@@ -30,6 +31,7 @@ public enum CLIParser {
       prims-paste convert <id> <docket|paseo>
       prims-paste bugs file
       prims-paste bugs tasks
+      prims-paste import-safepaste
     """
 
     public static func parse(_ argv: [String]) -> Result<CLICommand, CLIUsage> {
@@ -67,6 +69,8 @@ public enum CLIParser {
             case "tasks": return .success(CLICommand.bugsTasks)
             default: return .failure(CLIUsage("usage: prims-paste bugs file|tasks"))
             }
+        case "import-safepaste":
+            return .success(CLICommand.importSafepaste)
         default:
             return .failure(CLIUsage(usage))
         }

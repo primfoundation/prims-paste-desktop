@@ -33,7 +33,7 @@ enum PrimsPasteCLI {
             try proc.run()
             proc.waitUntilExit()
             if proc.terminationStatus != 0 { throw NotebookError.convert("open failed") }
-        case .tabs, .tabAdd, .add, .list, .convert, .bugsFile, .bugsTasks:
+        case .tabs, .tabAdd, .add, .list, .convert, .bugsFile, .bugsTasks, .importSafepaste:
             let store = try notebook()
             try runStore(cmd, store: store)
         }
@@ -115,6 +115,17 @@ enum PrimsPasteCLI {
                 )
                 _ = try store.convert(item.id, conversion: conv)
                 print("\(item.id)  docket  \(conv.ref)")
+            }
+        case .importSafepaste:
+            let oldKey = try SafePasteImport.loadLegacyKey()
+            let report = try SafePasteImport.run(into: store, oldKey: oldKey)
+            print("imported \(report.imported)  skipped \(report.skipped)")
+            for id in report.ids {
+                let idx = try store.loadIndex()
+                if let it = idx.items.first(where: { $0.id == id }) {
+                    let cap = it.caption.isEmpty ? "(no caption)" : it.caption
+                    print("\(it.id)  \(it.kind.rawValue)  \(it.bytes)b  \(cap)")
+                }
             }
         default:
             break

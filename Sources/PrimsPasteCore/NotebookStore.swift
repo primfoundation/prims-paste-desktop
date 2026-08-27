@@ -94,10 +94,13 @@ public final class NotebookStore: @unchecked Sendable {
         looksLikeKey: Bool = false,
         keyKind: String? = nil,
         day: String? = nil,
-        tabID: String? = nil
+        tabID: String? = nil,
+        createdAt: Date? = nil,
+        z: Int = 0
     ) throws -> ItemMeta {
         guard !plaintext.isEmpty else { throw NotebookError.emptyPayload }
         let now = Date()
+        let made = createdAt ?? now
         let id = "pp_" + UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
         try writeBlob(id: id, plaintext: plaintext)
         var index = try loadIndex()
@@ -108,15 +111,16 @@ public final class NotebookStore: @unchecked Sendable {
             y: point.y,
             width: size.width,
             height: size.height,
-            createdAt: now,
+            createdAt: made,
             updatedAt: now,
             bytes: plaintext.count,
             fingerprint: kind == .paste ? CryptoBox.fingerprint(plaintext) : nil,
             caption: caption,
             looksLikeKey: looksLikeKey,
             keyKind: keyKind,
-            day: day ?? ItemMeta.dayString(from: now),
-            tabID: tabID
+            day: day ?? ItemMeta.dayString(from: made),
+            tabID: tabID,
+            z: z
         )
         index.items.append(meta)
         try saveIndex(index)
