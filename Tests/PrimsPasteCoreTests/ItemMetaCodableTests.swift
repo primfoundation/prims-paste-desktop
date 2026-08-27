@@ -23,6 +23,7 @@ final class ItemMetaCodableTests: XCTestCase {
         XCTAssertEqual(idx.items[0].caption, "")
         XCTAssertFalse(idx.items[0].looksLikeKey)
         XCTAssertNil(idx.items[0].keyKind)
+        XCTAssertFalse(idx.items[0].hasImage)
         let created = ISO8601DateFormatter().date(from: "2026-08-27T21:04:11Z")!
         XCTAssertEqual(idx.items[0].day, ItemMeta.dayString(from: created))
     }

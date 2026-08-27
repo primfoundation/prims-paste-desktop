@@ -33,7 +33,7 @@ enum PrimsPasteCLI {
             try proc.run()
             proc.waitUntilExit()
             if proc.terminationStatus != 0 { throw NotebookError.convert("open failed") }
-        case .tabs, .tabAdd, .add, .list, .convert, .bugsFile, .bugsTasks, .importSafepaste:
+        case .tabs, .tabAdd, .add, .list, .convert, .bugsFile, .bugsTasks, .importSafepaste, .wantedSeed:
             let store = try notebook()
             try runStore(cmd, store: store)
         }
@@ -124,6 +124,10 @@ enum PrimsPasteCLI {
                 _ = try store.convert(item.id, conversion: conv)
                 print("\(item.id)  docket  \(conv.ref)")
             }
+        case .wantedSeed:
+            try store.seedFeaturesWanted()
+            let n = try store.loadIndex().items.filter { $0.tabID == FeaturesWanted.tabID }.count
+            print("features-wanted  stickies=\(n)")
         case .importSafepaste:
             let oldKey = try SafePasteImport.loadLegacyKey()
             let report = try SafePasteImport.run(into: store, oldKey: oldKey)

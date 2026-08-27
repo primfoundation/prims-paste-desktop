@@ -323,7 +323,9 @@ struct BoardView: View {
                 onDragEnded: ended,
                 onConvert: convert,
                 onOpen: open,
-                onSave: { board.saveNote(item.id, text: $0) }
+                onSave: { board.saveNote(item.id, text: $0) },
+                imageData: { board.imageAttachment(item.id) },
+                onAttachImage: { board.attachImage(to: item.id, $0) }
             )
         case .audio:
             AudioSticky(

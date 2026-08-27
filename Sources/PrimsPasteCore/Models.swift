@@ -56,6 +56,8 @@ public struct ItemMeta: Codable, Identifiable, Equatable, Sendable {
     public var z: Int
     /// If set, this sticky is also a docket task / paseo agent / …
     public var conversion: Conversion?
+    /// Encrypted PNG beside the text blob (`id-img.enc`). Notes can hold a picture.
+    public var hasImage: Bool
 
     public init(
         id: String,
@@ -74,7 +76,8 @@ public struct ItemMeta: Codable, Identifiable, Equatable, Sendable {
         day: String? = nil,
         tabID: String? = nil,
         z: Int = 0,
-        conversion: Conversion? = nil
+        conversion: Conversion? = nil,
+        hasImage: Bool = false
     ) {
         self.id = id
         self.kind = kind
@@ -94,6 +97,7 @@ public struct ItemMeta: Codable, Identifiable, Equatable, Sendable {
         self.tabID = tabID ?? d
         self.z = z
         self.conversion = conversion
+        self.hasImage = hasImage
     }
 
     public init(from decoder: Decoder) throws {
@@ -117,11 +121,12 @@ public struct ItemMeta: Codable, Identifiable, Equatable, Sendable {
         tabID = try c.decodeIfPresent(String.self, forKey: .tabID) ?? day
         z = try c.decodeIfPresent(Int.self, forKey: .z) ?? 0
         conversion = try c.decodeIfPresent(Conversion.self, forKey: .conversion)
+        hasImage = try c.decodeIfPresent(Bool.self, forKey: .hasImage) ?? false
     }
 
     enum CodingKeys: String, CodingKey {
         case id, kind, x, y, width, height, createdAt, updatedAt, bytes, fingerprint
-        case caption, description, looksLikeKey, keyKind, day, tabID, z, conversion
+        case caption, description, looksLikeKey, keyKind, day, tabID, z, conversion, hasImage
     }
 
     public static func dayString(from date: Date, calendar: Calendar = .current) -> String {
@@ -157,6 +162,7 @@ public struct ItemMeta: Codable, Identifiable, Equatable, Sendable {
         try c.encode(tabID, forKey: .tabID)
         try c.encode(z, forKey: .z)
         try c.encodeIfPresent(conversion, forKey: .conversion)
+        try c.encode(hasImage, forKey: .hasImage)
     }
 }
 

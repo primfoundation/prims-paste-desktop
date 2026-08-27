@@ -247,7 +247,12 @@ final class Board: ObservableObject {
     func dropClipboard(at point: CGPoint? = nil) {
         poke()
         if let img = imageFromPasteboard() {
-            dropImage(img, at: point)
+            let kind = selectedID.flatMap { id in items.first(where: { $0.id == id })?.kind }
+            if point == nil, ImagePaste.attachToSelected(kind), let id = selectedID {
+                attachImage(to: id, img)
+            } else {
+                dropImage(img, at: point)
+            }
             return
         }
         let text = NSPasteboard.general.string(forType: .string) ?? ""
@@ -269,6 +274,32 @@ final class Board: ObservableObject {
             size: BoardMetrics.stickySize,
             caption: "screenshot"
         )
+    }
+
+    func attachImage(to id: String, _ data: Data) {
+        poke()
+        guard let store, !data.isEmpty else { return }
+        do {
+            try store.writeImage(id, png: data)
+            if let i = items.firstIndex(where: { $0.id == id }) {
+                items[i].hasImage = true
+            }
+            cache.set("\(id)-img", data)
+        } catch {
+            errorText = "\(error)"
+        }
+    }
+
+    func imageAttachment(_ id: String) -> Data? {
+        if let hit = cache.get("\(id)-img") { return hit }
+        guard let store else { return nil }
+        do {
+            let data = try store.readImage(id)
+            if let data { cache.set("\(id)-img", data) }
+            return data
+        } catch {
+            return nil
+        }
     }
 
     func dropNote(at point: CGPoint? = nil, text: String = " ") {

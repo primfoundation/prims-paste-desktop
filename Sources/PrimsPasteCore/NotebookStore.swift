@@ -41,6 +41,10 @@ public final class NotebookStore: @unchecked Sendable {
         blobsDir.appendingPathComponent("\(id).enc")
     }
 
+    public func imageURL(id: String) -> URL {
+        blobsDir.appendingPathComponent("\(id)-img.enc")
+    }
+
     public func loadIndex() throws -> NotebookIndex {
         guard fm.fileExists(atPath: indexURL.path) else {
             return NotebookIndex()
@@ -83,6 +87,28 @@ public final class NotebookStore: @unchecked Sendable {
         if fm.fileExists(atPath: url.path) {
             try fm.removeItem(at: url)
         }
+        let img = imageURL(id: id)
+        if fm.fileExists(atPath: img.path) {
+            try fm.removeItem(at: img)
+        }
+    }
+
+    public func writeImage(_ id: String, png: Data) throws {
+        guard !png.isEmpty else { throw NotebookError.emptyPayload }
+        let sealed = try CryptoBox.seal(plaintext: png, key: key)
+        try atomicWrite(sealed, to: imageURL(id: id), mode: 0o600)
+        var index = try loadIndex()
+        if let i = index.items.firstIndex(where: { $0.id == id }) {
+            index.items[i].hasImage = true
+            index.items[i].updatedAt = Date()
+            try saveIndex(index)
+        }
+    }
+
+    public func readImage(_ id: String) throws -> Data? {
+        let url = imageURL(id: id)
+        guard fm.fileExists(atPath: url.path) else { return nil }
+        return try CryptoBox.open(blob: try Data(contentsOf: url), key: key)
     }
 
     public func add(

@@ -61,7 +61,7 @@ enum Selftest {
         )
         let parsed = WhisperCommand.parseStdout("whisper_init: x\nstripe live key")
         check("whisper parse drops logs", parsed == "stripe live key")
-        check("features list count", FeaturesWanted.all.count == 27)
+        check("features list count", FeaturesWanted.all.count == 31)
         check("cli parse convert", {
             if case .convert(let id, let t) = try? CLIParser.parse(["convert", "pp_x", "docket"]).get() {
                 return id == "pp_x" && t == .docketTask

@@ -11,6 +11,7 @@ final class FeaturesWantedTests: XCTestCase {
             "idle-cover", "local-ai", "low-mem", "no-capture",
             "calendar-drawer", "filter-dwmy", "view-layout", "view-timeline",
             "view-week", "view-month", "convert-to", "cli",
+            "paste-into-note", "resize-drag", "custom-themes", "installable-themes",
         ]
         for id in need {
             XCTAssertTrue(ids.contains(id), "missing \(id)")

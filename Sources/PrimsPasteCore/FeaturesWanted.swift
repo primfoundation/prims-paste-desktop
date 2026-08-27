@@ -70,7 +70,7 @@ public enum FeaturesWanted {
         WantedFeature(
             id: "pictures",
             title: "Pictures and screenshots",
-            body: "Paste or drop images. Encrypted blobs, shown on the sticky."
+            body: "Paste or drop images as a new sticky, or onto a selected note."
         ),
         WantedFeature(
             id: "big-tabs",
@@ -151,6 +151,26 @@ public enum FeaturesWanted {
             id: "cli",
             title: "CLI control",
             body: "prims-paste CLI talks to the same notebook: open, tabs, add, list, convert, bugs file, bugs tasks."
+        ),
+        WantedFeature(
+            id: "paste-into-note",
+            title: "Paste image into a note",
+            body: "With a note selected, ⌘V or drop a screenshot onto it. It stays on that sticky, Miro-style. Empty board still makes a new image sticky."
+        ),
+        WantedFeature(
+            id: "resize-drag",
+            title: "Resize stickies by dragging",
+            body: "No corner handle yet. Miro lets you grab an edge and size the card. Need that."
+        ),
+        WantedFeature(
+            id: "custom-themes",
+            title: "Custom themes in settings",
+            body: "Style inheritance is poor. Settings should offer named themes to pick from, not one hardcoded paper pack."
+        ),
+        WantedFeature(
+            id: "installable-themes",
+            title: "Installable themes",
+            body: "Themes you can add, not just a built-in list. Drop a theme pack in and pick it in settings."
         ),
     ]
 }

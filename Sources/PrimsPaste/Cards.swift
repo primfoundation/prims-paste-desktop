@@ -1,6 +1,7 @@
 import AppKit
 import PrimsPasteCore
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct StickyCard<Content: View>: View {
     let item: ItemMeta
@@ -201,17 +202,41 @@ struct NoteSticky: View {
     let onConvert: (ConvertTarget) -> Void
     let onOpen: () -> Void
     let onSave: (String) -> Void
+    let imageData: () -> Data?
+    let onAttachImage: (Data) -> Void
 
     var body: some View {
         StickyCard(
             item: item, selected: selected, listening: false, dragging: dragging, lift: lift,
             onSelect: onSelect, onDelete: onDelete, onDragBegin: onDragBegin, onDragChanged: onDragChanged, onDragEnded: onDragEnded, onConvert: onConvert, onOpen: onOpen
         ) {
-            TextEditor(text: $text)
-                .font(Ink.body)
-                .foregroundStyle(Ink.ink)
-                .scrollContentBackground(.hidden)
-                .onChange(of: text) { _, new in onSave(new) }
+            VStack(alignment: .leading, spacing: 6) {
+                TextEditor(text: $text)
+                    .font(Ink.body)
+                    .foregroundStyle(Ink.ink)
+                    .scrollContentBackground(.hidden)
+                    .onChange(of: text) { _, new in onSave(new) }
+                if item.hasImage, let data = imageData(), let ns = NSImage(data: data) {
+                    Image(nsImage: ns)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxHeight: 96)
+                }
+            }
+            .onDrop(of: [.image, .png, .tiff], isTargeted: nil) { providers in
+                for p in providers where p.canLoadObject(ofClass: NSImage.self) {
+                    _ = p.loadObject(ofClass: NSImage.self) { obj, _ in
+                        if let img = obj as? NSImage,
+                           let tiff = img.tiffRepresentation,
+                           let rep = NSBitmapImageRep(data: tiff),
+                           let png = rep.representation(using: .png, properties: [:]) {
+                            Task { @MainActor in onAttachImage(png) }
+                        }
+                    }
+                    return true
+                }
+                return false
+            }
         }
     }
 }

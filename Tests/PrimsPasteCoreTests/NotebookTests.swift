@@ -67,6 +67,27 @@ final class NotebookTests: XCTestCase {
         XCTAssertEqual(try store2.readBlob(id: meta.id), secret)
     }
 
+    func testAttachImageToNoteKeepsTextBlob() throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("primspaste-test-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let store = try NotebookStore(root: dir, key: SymmetricKey(size: .bits256))
+        let meta = try store.add(
+            kind: .note,
+            plaintext: Data("hello note".utf8),
+            at: CGPoint(x: 0, y: 0),
+            size: CGSize(width: 10, height: 10)
+        )
+        let png = Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x01])
+        try store.writeImage(meta.id, png: png)
+        XCTAssertEqual(try store.readBlob(id: meta.id), Data("hello note".utf8))
+        XCTAssertEqual(try store.readImage(meta.id), png)
+        XCTAssertTrue(try store.loadIndex().items[0].hasImage)
+        XCTAssertTrue(ImagePaste.attachToSelected(.note))
+        XCTAssertFalse(ImagePaste.attachToSelected(.image))
+        XCTAssertFalse(ImagePaste.attachToSelected(nil))
+    }
+
     func testNoTTLItemsSurviveReload() throws {
         let dir = FileManager.default.temporaryDirectory
             .appendingPathComponent("primspaste-test-\(UUID().uuidString)")

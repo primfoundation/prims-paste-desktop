@@ -13,6 +13,7 @@ public enum CLICommand: Equatable, Sendable {
     case bugsFile
     case bugsTasks
     case importSafepaste
+    case wantedSeed
 }
 
 public struct CLIUsage: Error, Equatable, Sendable {
@@ -32,6 +33,7 @@ public enum CLIParser {
       prims-paste bugs file
       prims-paste bugs tasks
       prims-paste import-safepaste
+      prims-paste wanted
     """
 
     public static func parse(_ argv: [String]) -> Result<CLICommand, CLIUsage> {
@@ -71,6 +73,8 @@ public enum CLIParser {
             }
         case "import-safepaste":
             return .success(CLICommand.importSafepaste)
+        case "wanted":
+            return .success(CLICommand.wantedSeed)
         default:
             return .failure(CLIUsage(usage))
         }
