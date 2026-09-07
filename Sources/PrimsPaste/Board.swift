@@ -420,103 +420,211 @@ final class Board: ObservableObject {
     }
 
     func saveChatSettings() {
-        guard let store else { return }
+        if chat.rejectedBecauseOnline {
+            errorText = "local models only — endpoint must be localhost"
+            return
+        }
+        try? store?.saveChat(chat)
+        showSettings = false
+        poke()
+    }
+
+    func askWhatItWas(_ id: String) async {
+        guard let said = await voice.captureCaption(for: id) else { return }
+        saveCaption(id, said)
+    }
+
+    func convert(_ id: String, to target: ConvertTarget) {
+        Task {
+            do {
+                _ = try await convertNow(id, to: target)
+            } catch {
+                errorText = "\(error)"
+            }
+        }
+    }
+
+    func convertNow(_ id: String, to target: ConvertTarget) async throws -> ItemMeta {
+        poke()
+        guard let store else { throw NotebookError.convert("store closed") }
+        if target == .note {
+            if let conv = items.first(where: { $0.id == id })?.conversion {
+                try ConvertLive.shared.revert(conv)
+            }
+            let meta = try store.clearConversion(id)
+            if let i = items.firstIndex(where: { $0.id == id }) {
+                items[i] = meta
+            }
+            return meta
+        }
+        let caption = items.first(where: { $0.id == id })?.caption ?? ""
+        let conv = try ConvertLive.shared.convert(
+            target: target,
+            stickyID: id,
+            caption: caption
+        )
+        let meta = try store.convert(id, conversion: conv)
+        if let i = items.firstIndex(where: { $0.id == id }) {
+            items[i] = meta
+        }
+        return meta
+    }
+
+    func openTaskEditor(_ id: String) {
+        poke()
+        Task {
+            do {
+                var item = items.first(where: { $0.id == id })
+                if item?.conversion?.target != .docketTask {
+                    item = try await convertNow(id, to: .docketTask)
+                }
+                guard let item, let tid = Convert.docketID(from: item.conversion?.ref ?? "") else {
+                    throw NotebookError.convert("no docket card")
+                }
+                let card = try ConvertLive.shared.viewTask(id: tid)
+                taskSession = TaskSession(stickyID: id, card: card)
+            } catch {
+                errorText = "\(error)"
+            }
+        }
+    }
+
+    func closeTaskEditor() {
+        taskSession = nil
+        poke()
+    }
+
+    func saveTask(stickyID: String, card: DocketCard) {
+        poke()
         do {
-            try store.saveChat(chat)
-            poke()
+            try ConvertLive.shared.saveTask(card)
+            if let store {
+                _ = try store.updateCaption(stickyID, caption: card.title)
+            }
+            if let i = items.firstIndex(where: { $0.id == stickyID }) {
+                items[i].caption = card.title
+                if var conv = items[i].conversion {
+                    conv.title = card.title
+                    items[i].conversion = conv
+                }
+            }
+            if var session = taskSession {
+                session.card = card
+                taskSession = session
+            }
         } catch {
             errorText = "\(error)"
         }
     }
 
-    func delete(_ id: String) {
+    func revertToNote(_ id: String) {
+        convert(id, to: .note)
+    }
+
+    func saveCaption(_ id: String, _ caption: String) {
         guard let store else { return }
         do {
-            try store.remove(id)
-            items.removeAll { $0.id == id }
+            let meta = try store.updateCaption(id, caption: caption)
+            if let i = items.firstIndex(where: { $0.id == id }) {
+                items[i] = meta
+            }
+        } catch {
+            errorText = "\(error)"
+        }
+    }
+
+    func saveNote(_ id: String, text: String) {
+        poke()
+        noteTasks[id]?.cancel()
+        noteTasks[id] = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 350_000_000)
+            guard !Task.isCancelled else { return }
+            self?.writeNote(id, text: text)
+        }
+    }
+
+    private func writeNote(_ id: String, text: String) {
+        guard let store else { return }
+        let data = Data(text.utf8)
+        guard !data.isEmpty else { return }
+        do {
+            let meta = try store.updatePayload(id, plaintext: data)
+            cache.set(id, data)
+            if let i = items.firstIndex(where: { $0.id == id }) {
+                items[i] = meta
+            }
+        } catch NotebookError.emptyPayload {
+            return
+        } catch {
+            errorText = "\(error)"
+        }
+    }
+
+    func saveAudio(_ id: String, data: Data) {
+        guard let store else { return }
+        do {
+            let meta = try store.updatePayload(id, plaintext: data)
+            cache.set(id, data)
+            if let i = items.firstIndex(where: { $0.id == id }) {
+                items[i] = meta
+            }
+        } catch {
+            errorText = "\(error)"
+        }
+    }
+
+    func deleteSelected() {
+        guard let id = selectedID else { return }
+        delete(id)
+    }
+
+    func delete(_ id: String) {
+        do {
+            try store?.remove(id)
             cache.remove(id)
-            cache.remove("\(id)-img")
+            items.removeAll { $0.id == id }
             if selectedID == id { selectedID = nil }
         } catch {
             errorText = "\(error)"
         }
     }
 
-    func addNewTabFromSheet() {
-        createTab()
-    }
-
-    func selectTab(_ id: String) {
-        selectedTabID = id
-        selectedID = nil
-        poke()
-    }
-
-    func loadTaskSession(_ stickyID: String, conversion: Conversion) {
-        guard conversion.target == .docketTask, let id = Convert.docketID(from: conversion.ref) else { return }
-        do {
-            let card = try ConvertLive.shared.viewTask(id: id)
-            taskSession = TaskSession(stickyID: stickyID, card: card)
-        } catch {
-            errorText = "\(error)"
-        }
-    }
-
-    func saveTaskSession() {
-        guard let taskSession else { return }
-        do {
-            try ConvertLive.shared.saveTask(taskSession.card)
-            self.taskSession = nil
-        } catch {
-            errorText = "\(error)"
-        }
-    }
-
-    func cancelTaskSession() {
-        taskSession = nil
-    }
-
-    func convert(_ id: String, target: ConvertTarget) {
-        guard let store, let i = items.firstIndex(where: { $0.id == id }) else { return }
-        do {
-            if target == .note {
-                if let existing = items[i].conversion {
-                    try ConvertLive.shared.revert(existing)
-                    items[i] = try store.clearConversion(id)
-                }
-                return
-            }
-            let conv = try ConvertLive.shared.convert(
-                target: target,
-                stickyID: id,
-                caption: items[i].caption
-            )
-            items[i] = try store.convert(id, conversion: conv)
-        } catch {
-            errorText = "\(error)"
-        }
+    func commitTypedPaste() {
+        dropPaste(typedPaste)
+        typedPaste = ""
+        pasteSheet = false
     }
 
     private func imageFromPasteboard() -> Data? {
         let pb = NSPasteboard.general
-        guard let data = pb.data(forType: .png) ?? pb.data(forType: .tiff) else { return nil }
-        if pb.availableType(from: [.png]) != nil { return data }
-        guard let image = NSImage(data: data),
-              let tiff = image.tiffRepresentation,
-              let rep = NSBitmapImageRep(data: tiff) else { return nil }
-        return rep.representation(using: .png, properties: [:])
+        if let png = pb.data(forType: .png), !png.isEmpty { return png }
+        if let tiff = pb.data(forType: .tiff),
+           let img = NSImage(data: tiff),
+           let tiffRep = img.tiffRepresentation,
+           let rep = NSBitmapImageRep(data: tiffRep),
+           let png = rep.representation(using: .png, properties: [:]) {
+            return png
+        }
+        return nil
+    }
+}
+
+extension Color {
+    var hex: String {
+        let n = NSColor(self)
+        guard let s = n.usingColorSpace(.sRGB) else { return "#888888" }
+        return String(format: "#%02X%02X%02X", Int(s.redComponent * 255), Int(s.greenComponent * 255), Int(s.blueComponent * 255))
     }
 
-    private func askWhatItWas(_ id: String) async {
-        guard let store, let item = items.first(where: { $0.id == id }) else { return }
-        guard !item.looksLikeKey else { return }
-        guard voice.enabled else { return }
-        guard let text = await voice.askWhatItWas() else { return }
-        do {
-            let meta = try store.updateCaption(id, caption: text)
-            if let i = items.firstIndex(where: { $0.id == id }) { items[i] = meta }
-        } catch {
-            errorText = "\(error)"
-        }
+    init(hex: String) {
+        var h = hex.trimmingCharacters(in: .whitespacesAndNewlines)
+        if h.hasPrefix("#") { h.removeFirst() }
+        var n: UInt64 = 0
+        Scanner(string: h).scanHexInt64(&n)
+        self.init(
+            red: Double((n >> 16) & 0xFF) / 255,
+            green: Double((n >> 8) & 0xFF) / 255,
+            blue: Double(n & 0xFF) / 255
+        )
     }
 }
