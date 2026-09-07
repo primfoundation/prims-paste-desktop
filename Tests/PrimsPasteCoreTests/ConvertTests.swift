@@ -1,6 +1,24 @@
 import CryptoKit
+import Foundation
 import XCTest
 @testable import PrimsPasteCore
+
+private final class ArgumentRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storage: [[String]] = []
+
+    func append(_ value: [String]) {
+        lock.lock()
+        storage.append(value)
+        lock.unlock()
+    }
+
+    func snapshot() -> [[String]] {
+        lock.lock()
+        defer { lock.unlock() }
+        return storage
+    }
+}
 
 final class ConvertTests: XCTestCase {
     func testNeverTouchesPayload() {
@@ -32,20 +50,50 @@ final class ConvertTests: XCTestCase {
         XCTAssertEqual(try store.readBlob(id: meta.id), Data("sk-live-do-not-send-to-docket".utf8))
     }
 
-    func testLiveDocketCreate() throws {
+    func testDocketCreateContractIsHermetic() throws {
         let pack = FileManager.default.temporaryDirectory
             .appendingPathComponent("primspaste-docket-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: pack) }
-        let live = ConvertLive(packDir: pack)
+        let seen = ArgumentRecorder()
+        let live = ConvertLive(docketBin: "docket-prim", packDir: pack) { argv in
+            seen.append(argv)
+            if argv.contains("init") {
+                try FileManager.default.createDirectory(at: pack, withIntermediateDirectories: true)
+                try Data().write(to: pack.appendingPathComponent("tasks.jsonl"))
+                return (0, Data(#"{"ok":true}"#.utf8))
+            }
+            if argv.contains("task-create") {
+                return (0, Data(#"{"id":"TASK-0001"}"#.utf8))
+            }
+            return (1, Data("unexpected command".utf8))
+        }
         let conv = try live.convert(target: .docketTask, stickyID: "pp_test", caption: "invoice follow-up")
         XCTAssertEqual(conv.target, .docketTask)
         XCTAssertEqual(conv.title, "invoice follow-up")
+        XCTAssertTrue(conv.ref.contains("TASK-0001"), conv.ref)
+        let flat = seen.snapshot().flatMap { $0 }.joined(separator: " ")
+        XCTAssertTrue(flat.contains("docket-prim init"), flat)
+        XCTAssertTrue(flat.contains("task-create"), flat)
+        XCTAssertTrue(flat.contains("prims-paste:pp_test"), flat)
+        XCTAssertFalse(flat.contains("sk-live-do-not-send-to-docket"), flat)
+    }
+
+    func testInstalledDocketCreateWhenAvailable() throws {
+        let pack = FileManager.default.temporaryDirectory
+            .appendingPathComponent("primspaste-docket-integration-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: pack) }
+        let live = ConvertLive(packDir: pack)
+        guard FileManager.default.isExecutableFile(atPath: live.docketBin) else {
+            throw XCTSkip("docket-prim is not installed at \(live.docketBin)")
+        }
+        let conv = try live.convert(target: .docketTask, stickyID: "pp_test", caption: "invoice follow-up")
+        XCTAssertEqual(conv.target, .docketTask)
         XCTAssertTrue(conv.ref.contains("TASK-"), conv.ref)
         XCTAssertTrue(FileManager.default.fileExists(atPath: pack.appendingPathComponent("tasks.jsonl").path))
     }
 
     func testPaseoRunnerGetsNoPayload() throws {
-        var seen: [[String]] = []
+        let seen = ArgumentRecorder()
         let live = ConvertLive(packDir: URL(fileURLWithPath: "/tmp/pp-docket")) { argv in
             seen.append(argv)
             let json = #"{"agentId":"agt_test"}"#
@@ -53,8 +101,8 @@ final class ConvertTests: XCTestCase {
         }
         let conv = try live.convert(target: .paseoAgent, stickyID: "pp_1", caption: "watch the haul")
         XCTAssertEqual(conv.ref, "paseo:agt_test")
-        let flat = seen.flatMap { $0 }.joined(separator: " ")
-        XCTAssertFalse(flat.contains("sk-"))
+        let flat = seen.snapshot().flatMap { $0 }.joined(separator: " ")
+        XCTAssertFalse(flat.contains("sk-live-do-not-send-to-paseo"))
         XCTAssertTrue(flat.contains("paseo"))
         XCTAssertTrue(flat.contains("watch the haul"))
     }
@@ -97,7 +145,7 @@ final class ConvertTests: XCTestCase {
     }
 
     func testViewAndSaveTaskNeverSeePayload() throws {
-        var seen: [[String]] = []
+        let seen = ArgumentRecorder()
         let json = #"{"id":"TASK-0009","title":"Ship login","status":"To Do","notes":"Brief one. Brief two for length and a second sentence.","requirements":["Keep the sticky linked to this card.","Do not copy secret payloads from the sticky."],"test-cases":["The editor opens."],"acceptance-criteria":["conversion.ref points at this docket card.","The docket title matches the sticky caption."]}"#
         let live = ConvertLive(packDir: URL(fileURLWithPath: "/tmp/pp-docket")) { argv in
             seen.append(argv)
@@ -108,18 +156,32 @@ final class ConvertTests: XCTestCase {
         var draft = card
         draft.title = "Ship login for real"
         try live.saveTask(draft)
-        let flat = seen.flatMap { $0 }.joined(separator: " ")
+        let flat = seen.snapshot().flatMap { $0 }.joined(separator: " ")
         XCTAssertFalse(flat.contains("sk-live"))
         XCTAssertFalse(flat.contains("do-not-send"))
         XCTAssertTrue(flat.contains("task-edit"))
         XCTAssertTrue(flat.contains("Ship login for real"))
     }
 
-    func testRevertArchivesDocketCard() throws {
+    func testDocketRevertContractIsHermetic() throws {
+        let seen = ArgumentRecorder()
+        let live = ConvertLive(docketBin: "docket-prim", packDir: URL(fileURLWithPath: "/tmp/pp-docket")) { argv in
+            seen.append(argv)
+            return (0, Data(#"{"ok":true}"#.utf8))
+        }
+        try live.revert(Conversion(target: .docketTask, ref: "docket:/tmp/pack#TASK-0007", title: "invoice"))
+        let flat = seen.snapshot().flatMap { $0 }.joined(separator: " ")
+        XCTAssertTrue(flat.contains("task-archive TASK-0007"), flat)
+    }
+
+    func testInstalledDocketRevertWhenAvailable() throws {
         let pack = FileManager.default.temporaryDirectory
-            .appendingPathComponent("primspaste-docket-\(UUID().uuidString)")
+            .appendingPathComponent("primspaste-docket-revert-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: pack) }
         let live = ConvertLive(packDir: pack)
+        guard FileManager.default.isExecutableFile(atPath: live.docketBin) else {
+            throw XCTSkip("docket-prim is not installed at \(live.docketBin)")
+        }
         let conv = try live.convert(target: .docketTask, stickyID: "pp_test", caption: "invoice follow-up")
         try live.revert(conv)
         let lines = try String(contentsOf: pack.appendingPathComponent("tasks.jsonl"), encoding: .utf8)

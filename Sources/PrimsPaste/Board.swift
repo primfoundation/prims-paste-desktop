@@ -189,13 +189,15 @@ final class Board: ObservableObject {
         do {
             let key = try KeychainKey.loadOrCreate()
             let store = try NotebookStore(root: Paths.defaultRoot, key: key)
-            try? store.seedFeaturesWanted()
+            if StartupPolicy.developerSeedsEnabled() {
+                try? store.seedFeaturesWanted()
+            }
             self.store = store
             let idx = try store.loadIndex()
             items = idx.items
             tabs = idx.tabs
             chat = idx.chat
-            selectedTabID = FeaturesWanted.tabID
+            selectedTabID = StartupPolicy.initialTabID(idx.tabs)
             locked = false
             unlockedOnce = true
             shuttered = false

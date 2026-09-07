@@ -1,0 +1,44 @@
+name: Primboard verify
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: primboard-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  macos:
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Record toolchain
+        run: swift --version
+      - name: Run Swift package tests
+        run: swift test --parallel
+      - name: Build release binaries
+        run: swift build -c release
+      - name: Run product selftest without touching the real notebook
+        env:
+          HOME: ${{ runner.temp }}/primboard-home
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME"
+          .build/release/PrimsPaste --selftest
+      - name: Verify compatibility-sensitive identifiers are still intentional
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q '<string>sh.prims.paste</string>' Info.plist
+          grep -q 'name: "PrimsPaste"' Package.swift
+          grep -q 'name: "prims-paste"' Package.swift
+          grep -q '".prims-paste"' Sources/PrimsPasteCore/Models.swift
+          grep -q 'service = "sh.prims.paste"' Sources/PrimsPasteCore/KeychainKey.swift
