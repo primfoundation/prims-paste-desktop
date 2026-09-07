@@ -101,7 +101,7 @@ public struct ConvertLive: ConvertRunning, Sendable {
         try FileManager.default.createDirectory(at: packDir, withIntermediateDirectories: true)
         if !FileManager.default.fileExists(atPath: packDir.appendingPathComponent("tasks.jsonl").path) {
             let (code, out) = try run([
-                docketBin, "init", "--dir", packDir.path, "--name", "Prims Paste", "--id", "prims-paste", "--json",
+                docketBin, "init", "--dir", packDir.path, "--name", "Primboard", "--id", "prims-paste", "--json",
             ])
             if code != 0 {
                 throw NotebookError.convert("docket init failed: \(stderrish(out))")
@@ -112,7 +112,7 @@ public struct ConvertLive: ConvertRunning, Sendable {
             docketBin, "task-create", "--dir", packDir.path, "--json",
             "--title", title,
             "--notes", notes,
-            "--req", "Keep the Prims Paste sticky linked to this docket card.",
+            "--req", "Keep the Primboard sticky linked to this docket card.",
             "--req", "Do not copy secret payloads from the sticky into this pack.",
             "--case", "The sticky shows a DOCKET badge and this task id after convert.",
             "--accept", "conversion.ref points at this docket card.",
@@ -131,7 +131,7 @@ public struct ConvertLive: ConvertRunning, Sendable {
 
     private func createPaseo(stickyID: String, title: String) throws -> Conversion {
         let prompt = """
-        You are working a Prims Paste sticky.
+        You are working a Primboard sticky.
         Title: \(title)
         Sticky id: \(stickyID)
         Do the work described by the title. Do not ask for a secret payload; it is not in this prompt.

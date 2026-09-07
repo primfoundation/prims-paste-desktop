@@ -19,7 +19,7 @@ struct PrimsPasteApp: App {
     @StateObject private var audio = AudioIO()
 
     var body: some Scene {
-        WindowGroup("Prims Paste") {
+        WindowGroup("Primboard") {
             Group {
                 if board.locked {
                     UnlockView(board: board)
@@ -74,7 +74,7 @@ struct UnlockView: View {
                 FolioMark(fill: Ink.ink)
                     .frame(width: 72, height: 72)
                     .padding(.bottom, 6)
-                Text("Prims Paste")
+                Text("Primboard")
                     .font(Ink.display)
                     .foregroundStyle(Ink.ink)
                 Button("Touch ID") {

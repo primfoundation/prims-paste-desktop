@@ -1,13 +1,14 @@
 # prims-paste-desktop
 
 <p align="center">
-  <img src="brand/lockup-paper.png" alt="Prims Paste" width="520">
+  <img src="brand/lockup-paper.png" alt="Primboard" width="520">
 </p>
 
 GitHub: https://github.com/primfoundation/prims-paste-desktop
 
-App: `~/Applications/Prims Paste.app`  
-Identifier: `sh.prims.paste`
+App: `~/Applications/Primboard.app`  
+Display name: **Primboard**  
+Identifier: `sh.prims.paste` (keep this; TCC and the executable stay `PrimsPaste`)
 
 Encrypted sticky board for this Mac. Touch ID to open. Not SafePaste; no CLI broker, no 24h TTL, no shared store.
 

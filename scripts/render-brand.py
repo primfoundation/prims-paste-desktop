@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render Prims Paste brand from the official Prim folio (prim.brand)."""
+"""Render Primboard brand from the official Prim folio (prim.brand)."""
 from __future__ import annotations
 
 import hashlib
@@ -54,7 +54,7 @@ def render_lockup() -> None:
     target_h = 280
     ratio = target_h / mark.size[1]
     mark = mark.resize((round(mark.size[0] * ratio), target_h), Image.Resampling.LANCZOS)
-    text = "Prims Paste"
+    text = "Primboard"
     dummy = ImageDraw.Draw(Image.new("RGBA", (8, 8)))
     bbox = dummy.textbbox((0, 0), text, font=font)
     tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]

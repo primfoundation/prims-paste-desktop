@@ -154,11 +154,11 @@ final class Board: ObservableObject {
         var laError: NSError?
         let policy = LAPolicy.deviceOwnerAuthenticationWithBiometrics
         guard ctx.canEvaluatePolicy(policy, error: &laError) else {
-            errorText = "Touch ID is required to open Prims Paste"
+            errorText = "Touch ID is required to open Primboard"
             return
         }
         do {
-            let ok = try await ctx.evaluatePolicy(policy, localizedReason: "Open Prims Paste")
+            let ok = try await ctx.evaluatePolicy(policy, localizedReason: "Open Primboard")
             if ok { openStore() }
         } catch {
             errorText = "Touch ID cancelled"

@@ -49,7 +49,7 @@ struct BoardView: View {
             board.refreshCover()
         }
         .alert(
-            "Prims Paste",
+            "Primboard",
             isPresented: Binding(
                 get: { board.errorText != nil },
                 set: { if !$0 { board.errorText = nil } }
@@ -65,7 +65,7 @@ struct BoardView: View {
         HStack(spacing: 12) {
             FolioMark(fill: Ink.ink)
                 .frame(width: 22, height: 22)
-            Text("Prims Paste")
+            Text("Primboard")
                 .font(Ink.title)
                 .foregroundStyle(Ink.ink)
             Spacer()

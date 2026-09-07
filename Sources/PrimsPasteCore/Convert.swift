@@ -58,7 +58,7 @@ public enum Convert {
 
     public static func docketNotes(title: String) -> String {
         """
-        Converted from a Prims Paste sticky titled '\(title)'. This docket card is the working record for that sticky. Expand the brief here before treating the work as planned. The sticky keeps a link back to this card and does not copy secret payloads into the pack.
+        Converted from a Primboard sticky titled '\(title)'. This docket card is the working record for that sticky. Expand the brief here before treating the work as planned. The sticky keeps a link back to this card and does not copy secret payloads into the pack.
         """
     }
 }

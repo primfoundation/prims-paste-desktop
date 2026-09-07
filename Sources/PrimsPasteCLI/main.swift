@@ -26,7 +26,7 @@ enum PrimsPasteCLI {
             print(CLIParser.usage, terminator: "")
         case .open:
             let app = FileManager.default.homeDirectoryForCurrentUser
-                .appendingPathComponent("Applications/Prims Paste.app")
+                .appendingPathComponent("Applications/Primboard.app")
             let proc = Process()
             proc.executableURL = URL(fileURLWithPath: "/usr/bin/open")
             proc.arguments = ["-a", app.path]

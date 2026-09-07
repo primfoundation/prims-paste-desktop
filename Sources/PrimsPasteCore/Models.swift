@@ -234,7 +234,7 @@ public enum NotebookError: Error, Equatable, CustomStringConvertible {
 
     public var description: String {
         switch self {
-        case .badMagic: return "blob is not a Prims Paste sealed box"
+        case .badMagic: return "blob is not a Primboard sealed box"
         case .missingBlob(let id): return "missing blob for \(id)"
         case .indexCorrupt: return "notebook index is corrupt"
         case .keychain(let s): return "keychain: \(s)"

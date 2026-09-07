@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>Prims Paste</string>
+	<string>Primboard</string>
 	<key>CFBundleExecutable</key>
 	<string>PrimsPaste</string>
 	<key>CFBundleIdentifier</key>
@@ -13,7 +13,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>Prims Paste</string>
+	<string>Primboard</string>
 	<key>CFBundleIconFile</key>
 	<string>AppIcon</string>
 	<key>CFBundlePackageType</key>
@@ -34,7 +34,17 @@
 	<true/>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<key>NSAccessibilityUsageDescription</key>
+	<string>Primboard fills the text or password field the cursor is in. It reads the other app's focused box, never this window's contents, and never sends the secret off this Mac.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Primboard records video notes you drop on the board. Recordings stay encrypted on this Mac.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Prims Paste records audio notes you drop on the board. Recordings stay encrypted on this Mac.</string>
+	<string>Primboard records audio notes you drop on the board. Recordings stay encrypted on this Mac.</string>
+	<key>NSScreenCaptureUsageDescription</key>
+	<string>Primboard shoots a selection to the clipboard so you can paste it onto the board. This window itself is not captured.</string>
+	<key>NSSupportsAutomaticTermination</key>
+	<false/>
+	<key>NSSupportsSuddenTermination</key>
+	<false/>
 </dict>
 </plist>

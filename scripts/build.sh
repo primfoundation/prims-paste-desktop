@@ -1,9 +1,9 @@
 #!/bin/bash
-# Build Prims Paste.app into ~/Applications.
+# Build Primboard.app into ~/Applications.
 # Signed as Developer ID Application: Eidos AGI LLC.
 set -eo pipefail
 PKG="$(cd "$(dirname "$0")/.." && pwd)"
-APP="$HOME/Applications/Prims Paste.app"
+APP="$HOME/Applications/Primboard.app"
 BIN="$PKG/.build/release/PrimsPaste"
 CLI="$PKG/.build/release/prims-paste"
 TEAM="Y6CQ4SWPWM"
@@ -19,8 +19,10 @@ if ! "$BIN" --selftest; then
   exit 1
 fi
 
+osascript -e 'quit app "Primboard"' 2>/dev/null || true
 osascript -e 'quit app "Prims Paste"' 2>/dev/null || true
 osascript -e 'quit app "SafePaste"' 2>/dev/null || true
+pkill -f "Primboard.app/Contents/MacOS/PrimsPaste" 2>/dev/null || true
 pkill -f "Prims Paste.app/Contents/MacOS/PrimsPaste" 2>/dev/null || true
 sleep 0.3
 

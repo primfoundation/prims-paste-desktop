@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Pixel + OCR + bundle proofs for the Prim folio on Prims Paste."""
+"""Pixel + OCR + bundle proofs for the Prim folio on Primboard."""
 from __future__ import annotations
 
 import hashlib
@@ -13,7 +13,7 @@ from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
 BRAND = ROOT / "brand"
-APP = Path.home() / "Applications" / "Prims Paste.app"
+APP = Path.home() / "Applications" / "Primboard.app"
 PROOF = Path("/tmp/prims-paste-brand-proof")
 failed = 0
 
