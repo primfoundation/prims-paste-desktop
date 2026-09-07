@@ -116,7 +116,7 @@ public enum CalendarLens {
         for (di, day) in days.enumerated() {
             let stack = (grouped[day] ?? []).sorted { $0.createdAt < $1.createdAt }
             for (i, item) in stack.enumerated() {
-                out[item.id] = CGPoint(x: 40 + Double(di) * colW, y: 40 + Double(i) * rowH)
+                out[item.id] = CGPoint(x: 40 + CGFloat(di) * colW, y: 40 + CGFloat(i) * rowH)
             }
         }
         return out
@@ -139,7 +139,7 @@ public enum CalendarLens {
             let col = min(max(diff, 0), 6)
             let row = stacks[col]
             stacks[col] += 1
-            out[item.id] = CGPoint(x: 24 + Double(col) * colW, y: 56 + Double(row) * rowH)
+            out[item.id] = CGPoint(x: 24 + CGFloat(col) * colW, y: 56 + CGFloat(row) * rowH)
         }
         return out
     }
@@ -170,8 +170,8 @@ public enum CalendarLens {
             let n = perDay[day, default: 0]
             perDay[day] = n + 1
             out[item.id] = CGPoint(
-                x: 16 + Double(col) * colW + Double(n) * 8,
-                y: 48 + Double(row) * rowH + Double(n) * 8
+                x: 16 + CGFloat(col) * colW + CGFloat(n) * 8,
+                y: 48 + CGFloat(row) * rowH + CGFloat(n) * 8
             )
         }
         return out
@@ -194,8 +194,8 @@ public enum CalendarLens {
             let col = m % 4
             let row = m / 4
             out[item.id] = CGPoint(
-                x: 24 + Double(col) * (colW + 40) + Double(n) * 6,
-                y: 48 + Double(row) * (rowH + 48) + Double(n) * 6
+                x: 24 + CGFloat(col) * (colW + 40) + CGFloat(n) * 6,
+                y: 48 + CGFloat(row) * (rowH + 48) + CGFloat(n) * 6
             )
         }
         return out
