@@ -6,37 +6,50 @@ on:
       - '.github/workflows/repair-board-source.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   repair:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'codex/primboard-stabilization'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
+          ref: codex/primboard-stabilization
           fetch-depth: 0
-          persist-credentials: false
-      - name: Reconstruct Board.swift from exact user-pushed base and apply only startup policy edits
+          persist-credentials: true
+      - name: Reconstruct exact base source and commit only the intended startup patch
         shell: python
         run: |
           import subprocess
           from pathlib import Path
           base = '25d2641443c1e9d4b55b2651c18188a378a3b166'
-          path = 'Sources/PrimsPaste/Board.swift'
-          text = subprocess.check_output(['git','show',f'{base}:{path}'], text=True)
+          path = Path('Sources/PrimsPaste/Board.swift')
+          text = subprocess.check_output(['git','show',f'{base}:{path.as_posix()}'], text=True)
           old = '''            let store = try NotebookStore(root: Paths.defaultRoot, key: key)\n            try? store.seedFeaturesWanted()\n            self.store = store\n            let idx = try store.loadIndex()\n            items = idx.items\n            tabs = idx.tabs\n            chat = idx.chat\n            selectedTabID = FeaturesWanted.tabID\n'''
           new = '''            let store = try NotebookStore(root: Paths.defaultRoot, key: key)\n            if StartupPolicy.developerSeedsEnabled() {\n                try? store.seedFeaturesWanted()\n            }\n            self.store = store\n            let idx = try store.loadIndex()\n            items = idx.items\n            tabs = idx.tabs\n            chat = idx.chat\n            selectedTabID = StartupPolicy.initialTabID(idx.tabs)\n'''
           if text.count(old) != 1:
               raise SystemExit('exact startup block not found once in base source')
           repaired = text.replace(old, new, 1)
-          Path('Board.swift.repaired').write_text(repaired)
-          print('base bytes', len(text.encode()))
-          print('repaired bytes', len(repaired.encode()))
-          print('only intended replacements:', text.replace(old, new, 1) == repaired)
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: primboard-board-repaired
-          path: Board.swift.repaired
-          if-no-files-found: error
-          retention-days: 1
+          path.write_text(repaired)
+          repair = Path('.github/workflows/repair-board-source.yml')
+          repair.unlink()
+          print('repaired Board.swift bytes', len(repaired.encode()))
+      - name: Verify diff is bounded to Board repair and this temporary workflow removal
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff -- Sources/PrimsPaste/Board.swift .github/workflows/repair-board-source.yml
+          changed="$(git diff --name-only | sort)"
+          expected=$'.github/workflows/repair-board-source.yml\nSources/PrimsPaste/Board.swift'
+          test "$changed" = "$expected"
+      - name: Commit repair to the existing PR branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'prim-foundation-repair-bot'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A Sources/PrimsPaste/Board.swift .github/workflows/repair-board-source.yml
+          git commit -m 'Primboard: restore full Board source with bounded startup policy patch'
+          git push origin HEAD:codex/primboard-stabilization
