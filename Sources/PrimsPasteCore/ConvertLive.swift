@@ -8,11 +8,29 @@ public struct ConvertLive: ConvertRunning, Sendable {
     public var packDir: URL
     public var run: @Sendable ([String]) throws -> (Int32, Data)
 
+    public static var defaultDocketBin: String {
+        if let override = ProcessInfo.processInfo.environment["PRIMBOARD_DOCKET_BIN"], !override.isEmpty {
+            return override
+        }
+        return FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".local/bin/docket-prim").path
+    }
+
+    public static var defaultPaseoBin: String {
+        if let override = ProcessInfo.processInfo.environment["PRIMBOARD_PASEO_BIN"], !override.isEmpty {
+            return override
+        }
+        return FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("bin/paseo").path
+    }
+
     public init(
-        docketBin: String = "/Users/dshanklinbv/.local/bin/docket-prim",
-        paseoBin: String = "/Users/dshanklinbv/bin/paseo",
+        docketBin: String = ConvertLive.defaultDocketBin,
+        paseoBin: String = ConvertLive.defaultPaseoBin,
         packDir: URL = Paths.docketPack,
-        run: @escaping @Sendable ([String]) throws -> (Int32, Data) = ConvertLive.process
+        run: @escaping @Sendable ([String]) throws -> (Int32, Data) = { argv in
+            try ConvertLive.process(argv)
+        }
     ) {
         self.docketBin = docketBin
         self.paseoBin = paseoBin
