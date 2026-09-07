@@ -75,7 +75,7 @@ final class ConvertTests: XCTestCase {
         XCTAssertTrue(flat.contains("docket-prim init"), flat)
         XCTAssertTrue(flat.contains("task-create"), flat)
         XCTAssertTrue(flat.contains("prims-paste:pp_test"), flat)
-        XCTAssertFalse(flat.contains("sk-"), flat)
+        XCTAssertFalse(flat.contains("sk-live-do-not-send-to-docket"), flat)
     }
 
     func testInstalledDocketCreateWhenAvailable() throws {
@@ -102,7 +102,7 @@ final class ConvertTests: XCTestCase {
         let conv = try live.convert(target: .paseoAgent, stickyID: "pp_1", caption: "watch the haul")
         XCTAssertEqual(conv.ref, "paseo:agt_test")
         let flat = seen.snapshot().flatMap { $0 }.joined(separator: " ")
-        XCTAssertFalse(flat.contains("sk-"))
+        XCTAssertFalse(flat.contains("sk-live-do-not-send-to-paseo"))
         XCTAssertTrue(flat.contains("paseo"))
         XCTAssertTrue(flat.contains("watch the haul"))
     }
