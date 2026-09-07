@@ -43,3 +43,27 @@ A subsequent human-authored checkpoint intentionally triggers the normal macOS v
 Mac CI proves source build/tests/selftest and guards compatibility strings. It does not prove Developer ID signing, TCC grants, existing-user migration, UI usability or runtime integration with external Docket/Paseo/Library services.
 
 The repository can be renamed to `primboard` only after external URL/clone references, automation and release paths are inventoried and a fresh clone under the new slug builds and opens the same existing store without changing the locked runtime identities.
+
+## Store transaction foundation — G3
+
+The updated app and CLI share an advisory file lock spanning each complete store
+operation. A recursive thread lock serializes one instance; `flock` coordinates
+independent instances/processes through a persistent, private `.store.lock` file.
+The lock file must never be removed while a store is open.
+
+Whole-index saves compare a monotonic revision and reject stale snapshots.
+Historical indexes without a revision read as revision zero; existing item IDs,
+store paths, Keychain identity and payload encryption remain unchanged. Run the
+updated app and CLI together: older binaries do not honor the new lock/revision
+contract and must not write concurrently with this version.
+
+File replacement writes a uniquely named private temporary file, flushes it,
+renames over the target without a remove gap, then flushes the containing directory.
+Tests cover independent writers, lost-update rejection, legacy index reads,
+old-reader validity, permissions, temporary-file cleanup and lock symlink rejection.
+Mac CI is the build/test gate for these Swift changes.
+
+This is file-level atomicity and cooperative transaction locking. It does not yet
+provide a journal spanning blob/index updates, encrypted index migration, encrypted
+backup/restore, power-loss fault injection, or signed-Mac/TCC release acceptance.
+Those remain separate open G3 gates.

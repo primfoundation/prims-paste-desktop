@@ -168,6 +168,7 @@ public struct ItemMeta: Codable, Identifiable, Equatable, Sendable {
 
 public struct NotebookIndex: Codable, Equatable, Sendable {
     public var version: Int
+    public var revision: UInt64
     public var items: [ItemMeta]
     public var tabs: [BoardTab]
     public var chat: ChatSettings
@@ -175,12 +176,14 @@ public struct NotebookIndex: Codable, Equatable, Sendable {
 
     public init(
         version: Int = 2,
+        revision: UInt64 = 0,
         items: [ItemMeta] = [],
         tabs: [BoardTab] = [],
         chat: ChatSettings = .none,
         seededFeaturesWanted: Bool = false
     ) {
         self.version = version
+        self.revision = revision
         self.items = items
         self.tabs = tabs
         self.chat = chat
@@ -190,6 +193,7 @@ public struct NotebookIndex: Codable, Equatable, Sendable {
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         version = try c.decodeIfPresent(Int.self, forKey: .version) ?? 1
+        revision = try c.decodeIfPresent(UInt64.self, forKey: .revision) ?? 0
         items = try c.decodeIfPresent([ItemMeta].self, forKey: .items) ?? []
         tabs = try c.decodeIfPresent([BoardTab].self, forKey: .tabs) ?? []
         chat = try c.decodeIfPresent(ChatSettings.self, forKey: .chat) ?? .none
@@ -203,7 +207,7 @@ public struct NotebookIndex: Codable, Equatable, Sendable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case version, items, tabs, chat, seededFeaturesWanted
+        case version, revision, items, tabs, chat, seededFeaturesWanted
     }
 
     public static func tabsFromDays(_ items: [ItemMeta]) -> [BoardTab] {
@@ -228,6 +232,7 @@ public enum NotebookError: Error, Equatable, CustomStringConvertible {
     case badMagic
     case missingBlob(String)
     case indexCorrupt
+    case staleIndex
     case keychain(String)
     case emptyPayload
     case convert(String)
@@ -237,6 +242,7 @@ public enum NotebookError: Error, Equatable, CustomStringConvertible {
         case .badMagic: return "blob is not a Primboard sealed box"
         case .missingBlob(let id): return "missing blob for \(id)"
         case .indexCorrupt: return "notebook index is corrupt"
+        case .staleIndex: return "notebook changed; reload before saving"
         case .keychain(let s): return "keychain: \(s)"
         case .emptyPayload: return "empty payload"
         case .convert(let s): return s
