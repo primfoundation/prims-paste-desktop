@@ -113,3 +113,19 @@ wrong keys, tampering, old-reader failure, payload/image round trips, private
 permissions, non-overwrite behavior, missing/extra data and unsafe path collisions.
 Mac CI verifies the implementation. Signing, TCC, actual Keychain reuse and
 existing-user acceptance still require the signed real-Mac release gate.
+
+## Safe Mac candidate preparation — 2026-09-08
+
+`scripts/build.sh` now checks a usable company signing identity before building
+and produces a candidate from an isolated archive of the committed source. It
+does not quit apps, overwrite the installed bundle, update the CLI link, or open
+the real notebook. Nested code is signed first; candidate verification requires
+the existing Developer ID/team, hardened runtime, timestamp, and no debug
+entitlement. The font license is included in the bundle.
+
+`scripts/mac_release.py notarize` records one Apple submission, resumes checks by
+ID, matches Apple's accepted log to the submitted ZIP hash, then staples a copy
+and verifies the final unpacked artifact. `MAC-RELEASE.md` assigns the remaining
+local-agent work and preserves the matched pre-migration app/store rollback
+boundary. Mocked failure tests and macOS CI bundle selftest verify the tooling;
+they do not close live signing, notarization, installed-store, or TCC gates.

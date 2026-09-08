@@ -26,6 +26,10 @@ jobs:
         run: swift test --parallel
       - name: Build release binaries
         run: swift build -c release
+      - name: Verify safe release preparation and assembled app
+        run: |
+          bash -n scripts/build.sh
+          python3 -m unittest discover -s tests/release -v
       - name: Run product selftest without touching the real notebook
         env:
           HOME: ${{ runner.temp }}/primboard-home
