@@ -235,6 +235,9 @@ public enum NotebookError: Error, Equatable, CustomStringConvertible {
     case staleIndex
     case backupInvalid
     case restoreDestinationExists
+    case transactionInvalid
+    case transactionPending
+    case transactionTooLarge
     case keychain(String)
     case emptyPayload
     case convert(String)
@@ -247,6 +250,9 @@ public enum NotebookError: Error, Equatable, CustomStringConvertible {
         case .staleIndex: return "notebook changed; reload before saving"
         case .backupInvalid: return "backup is incomplete, corrupt, or exceeds the supported size"
         case .restoreDestinationExists: return "restore requires a new directory; the existing notebook was not changed"
+        case .transactionInvalid: return "notebook recovery record or file state is invalid; preserve the store for recovery"
+        case .transactionPending: return "save was interrupted and may be committed; reopen the notebook to finish recovery before retrying"
+        case .transactionTooLarge: return "change exceeds the supported recovery journal size; no transaction was started"
         case .keychain(let s): return "keychain: \(s)"
         case .emptyPayload: return "empty payload"
         case .convert(let s): return s
