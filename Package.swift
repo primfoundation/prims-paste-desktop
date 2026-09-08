@@ -43,6 +43,7 @@ let package = Package(
             name: "PrimsPasteCoreTests",
             dependencies: ["PrimsPasteCore"],
             path: "Tests/PrimsPasteCoreTests",
+            exclude: ["Fixtures"],
             linkerSettings: [
                 .linkedFramework("AppKit"),
             ]

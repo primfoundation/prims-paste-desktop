@@ -90,11 +90,13 @@ public enum PrimPack {
         try kit.requireValid(record)
         let fm = FileManager.default
         let target = localURL(destination)
-        var parent = target.deletingLastPathComponent()
-        while parent.path != "/" {
-            let values = try parent.resourceValues(forKeys: [.isSymbolicLinkKey, .isDirectoryKey])
-            guard values.isSymbolicLink != true, values.isDirectory == true else { throw PrimLibraryError.invalid("Choose a local folder without symbolic links.") }
-            parent.deleteLastPathComponent()
+        var parent = (target.path as NSString).deletingLastPathComponent
+        while parent != "/" {
+            let attributes = try fm.attributesOfItem(atPath: parent)
+            guard attributes[.type] as? FileAttributeType == .typeDirectory else {
+                throw PrimLibraryError.invalid("Choose a local folder without symbolic links.")
+            }
+            parent = (parent as NSString).deletingLastPathComponent
         }
         guard !fm.fileExists(atPath: target.path), (try? fm.destinationOfSymbolicLink(atPath: target.path)) == nil else {
             throw PrimLibraryError.invalid("Export requires a new folder.")
