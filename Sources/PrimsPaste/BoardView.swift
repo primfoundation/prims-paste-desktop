@@ -36,8 +36,13 @@ struct BoardView: View {
         .sheet(isPresented: $board.pasteSheet) { pasteSheet }
         .sheet(isPresented: $board.showSettings) { SettingsView(board: board) }
         .sheet(isPresented: $board.showNewTab) { NewTabSheet(board: board) }
-        .sheet(isPresented: $board.showPrimLibrary) { PrimLibrarySheet(board: board) }
-        .sheet(item: $board.primSession) { PrimEditor(board: board, session: $0) }
+        .sheet(isPresented: $board.showPrimLibrary, onDismiss: { board.primSession = nil }) {
+            if let session = board.primSession {
+                PrimEditor(board: board, session: session)
+            } else {
+                PrimLibrarySheet(board: board)
+            }
+        }
         .onChange(of: board.reloadGeneration) { _, _ in noteDrafts.removeAll() }
         .sheet(item: $board.taskSession) { session in
             TaskEditor(board: board, stickyID: session.stickyID, card: session.card)

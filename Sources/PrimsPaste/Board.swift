@@ -303,7 +303,7 @@ final class Board: ObservableObject {
             let record = try kit.draft(title: source?.caption)
             primSession = PrimSession(id: "prim_" + UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased(),
                                       sourceID: source?.id, existingID: nil, kit: kit, record: record, expected: nil)
-            showPrimLibrary = false
+            showPrimLibrary = true
         } catch { errorText = error.localizedDescription }
     }
 
@@ -314,6 +314,7 @@ final class Board: ObservableObject {
             let data = try store.readBlob(id: id)
             let record = try PrimJSON.parse(data)
             primSession = PrimSession(id: id, sourceID: item.primSourceID, existingID: id, kit: kit, record: record, expected: data)
+            showPrimLibrary = true
         } catch { errorText = error.localizedDescription }
     }
 
@@ -331,6 +332,7 @@ final class Board: ObservableObject {
         reloadNotebook()
         selectedID = meta.id; selectedTabID = meta.tabID
         primSession = nil
+        showPrimLibrary = false
     }
 
     func exportPrim(_ id: String) {
@@ -353,6 +355,7 @@ final class Board: ObservableObject {
             let (kit, record) = try PrimPack.read(source, library: PrimLibrary.bundled())
             primSession = PrimSession(id: "prim_" + UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased(),
                                       sourceID: nil, existingID: nil, kit: kit, record: record, expected: nil)
+            showPrimLibrary = true
         } catch { errorText = error.localizedDescription }
     }
 
@@ -595,7 +598,7 @@ final class Board: ObservableObject {
             do {
                 _ = try await convertNow(id, to: target)
             } catch {
-                storeFailed(error)
+                errorText = error.localizedDescription
             }
         }
     }
@@ -607,7 +610,9 @@ final class Board: ObservableObject {
             if let conv = items.first(where: { $0.id == id })?.conversion {
                 try ConvertLive.shared.revert(conv)
             }
-            let meta = try store.clearConversion(id)
+            let meta: ItemMeta
+            do { meta = try store.clearConversion(id) }
+            catch { storeFailed(error); throw error }
             if let i = items.firstIndex(where: { $0.id == id }) {
                 items[i] = meta
             }
@@ -619,7 +624,9 @@ final class Board: ObservableObject {
             stickyID: id,
             caption: caption
         )
-        let meta = try store.convert(id, conversion: conv)
+        let meta: ItemMeta
+        do { meta = try store.convert(id, conversion: conv) }
+        catch { storeFailed(error); throw error }
         if let i = items.firstIndex(where: { $0.id == id }) {
             items[i] = meta
         }
@@ -640,7 +647,7 @@ final class Board: ObservableObject {
                 let card = try ConvertLive.shared.viewTask(id: tid)
                 taskSession = TaskSession(stickyID: id, card: card)
             } catch {
-                storeFailed(error)
+                errorText = error.localizedDescription
             }
         }
     }
@@ -652,11 +659,11 @@ final class Board: ObservableObject {
 
     func saveTask(stickyID: String, card: DocketCard) {
         poke()
+        guard let store, !locked, !recoveryNeeded else { return }
+        do { try ConvertLive.shared.saveTask(card) }
+        catch { errorText = error.localizedDescription; return }
         do {
-            try ConvertLive.shared.saveTask(card)
-            if let store {
-                _ = try store.updateCaption(stickyID, caption: card.title)
-            }
+            _ = try store.updateCaption(stickyID, caption: card.title)
             if let i = items.firstIndex(where: { $0.id == stickyID }) {
                 items[i].caption = card.title
                 if var conv = items[i].conversion {
@@ -710,8 +717,7 @@ final class Board: ObservableObject {
 
     private func writeNote(_ id: String, text: String) {
         guard let store, !locked, !recoveryNeeded else { return }
-        let data = Data(text.utf8)
-        guard !data.isEmpty else { return }
+        let data = Data((text.isEmpty ? " " : text).utf8)
         do {
             let meta = try store.updatePayload(id, plaintext: data, expected: pendingNotes[id]?.expected)
             cache.set(id, data)

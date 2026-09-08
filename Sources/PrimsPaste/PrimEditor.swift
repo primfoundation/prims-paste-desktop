@@ -81,7 +81,7 @@ struct PrimEditor: View {
             if !error.isEmpty { Text(error).font(.caption).foregroundStyle(.red).textSelection(.enabled) }
             if error.isEmpty, !validationMessage.isEmpty { Text(validationMessage).font(.caption).foregroundStyle(.secondary) }
             HStack {
-                Button("Cancel") { board.primSession = nil }.keyboardShortcut(.cancelAction)
+                Button("Cancel") { board.showPrimLibrary = false }.keyboardShortcut(.cancelAction)
                 Spacer()
                 Button("Check") { check() }
                 Button("Save Prim") {
