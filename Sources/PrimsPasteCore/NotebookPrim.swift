@@ -2,6 +2,29 @@ import CryptoKit
 import Foundation
 
 extension NotebookStore {
+    /// Preserve a conflicted in-memory edit as a separate encrypted note.
+    public func saveDraftCopy(sourceID: String, plaintext: Data, operationID: String) throws -> ItemMeta {
+        guard operationID.range(of: "^draft_[a-f0-9]{32}\\z", options: .regularExpression) != nil else {
+            throw PrimLibraryError.invalid("Invalid recovery operation ID.")
+        }
+        return try storeLock.withLock {
+            var index = try loadIndex()
+            if let existing = index.items.first(where: { $0.id == operationID }) {
+                guard try readBlob(id: operationID) == plaintext else { throw NotebookError.staleIndex }
+                return existing
+            }
+            let source = index.items.first { $0.id == sourceID }, now = Date()
+            let item = ItemMeta(id: operationID, kind: .note, x: (source?.x ?? 20) + 35,
+                                y: (source?.y ?? 20) + 35, width: NotebookLayout.sticky, height: NotebookLayout.sticky,
+                                createdAt: now, updatedAt: now, bytes: plaintext.count,
+                                caption: "Recovered edit", tabID: source?.tabID, z: DragMath.nextZ(index.items))
+            index.items.append(item)
+            try commit(index, writes: ["\(operationID).enc": try sealTransactionBlob(plaintext)])
+            guard let persisted = try loadIndex().items.first(where: { $0.id == operationID }) else { throw NotebookError.missingBlob(operationID) }
+            return persisted
+        }
+    }
+
     /// Create a separate encrypted Prim; retain the source sticky and its exact payload.
     /// A caller-generated operation ID makes a retry after an uncertain commit idempotent.
     public func createPrim(sourceID: String?, kit: PrimKit, record: PrimJSON, operationID: String) throws -> ItemMeta {

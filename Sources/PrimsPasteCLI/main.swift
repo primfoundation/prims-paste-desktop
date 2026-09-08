@@ -65,6 +65,7 @@ enum PrimsPasteCLI {
             let index = try store.loadIndex()
             let title = index.items.first(where: { $0.id == source })?.caption
             var record = try kit.draft(title: title)
+            var suppliedIdentity = false
             if let input {
                 let url = URL(fileURLWithPath: input)
                 let values = try url.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey, .isSymbolicLinkKey])
@@ -73,11 +74,12 @@ enum PrimsPasteCLI {
                 }
                 let supplied = try PrimJSON.parse(Data(contentsOf: url))
                 guard let object = supplied.object else { throw PrimLibraryError.invalid("Record input must be an object.") }
+                suppliedIdentity = !(object[kit.identityField]?.string ?? "").isEmpty
                 record = .object((record.object ?? [:]).merging(object, uniquingKeysWith: { _, new in new }))
             }
             let op = operation ?? "prim_" + UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
             // Reuse the operation identity as the draft identity for idempotent CLI retries.
-            if input == nil { var object = record.object!; object[kit.identityField] = .string(op.replacingOccurrences(of: "_", with: "-")); record = .object(object) }
+            if !suppliedIdentity { var object = record.object!; object[kit.identityField] = .string(op.replacingOccurrences(of: "_", with: "-")); record = .object(object) }
             let item = try store.createPrim(sourceID: source, kit: kit, record: record, operationID: op)
             print("\(item.id)\t\(kit.pin.profileID)\t\(kit.pin.version)")
         case .primValidate(let id):

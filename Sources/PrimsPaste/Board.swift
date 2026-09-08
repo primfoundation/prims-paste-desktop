@@ -36,7 +36,11 @@ final class Board: ObservableObject {
     @Published var showRecovery = false
     @Published var recoveryNeeded = false
     @Published var reloadGeneration = 0
-    private struct PendingNote { var text: String; let expected: Data }
+    private struct PendingNote {
+        var text: String
+        let expected: Data
+        var recoveryID = "draft_" + UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
+    }
     private var pendingNotes: [String: PendingNote] = [:]
 
     struct PrimSession: Identifiable {
@@ -280,6 +284,17 @@ final class Board: ObservableObject {
         reloadNotebook()
         guard !recoveryNeeded else { return }
         flushNotes()
+    }
+
+    func savePendingCopies() {
+        guard let store, !locked, !recoveryNeeded else { return }
+        for (id, draft) in Array(pendingNotes) {
+            do {
+                _ = try store.saveDraftCopy(sourceID: id, plaintext: Data((draft.text.isEmpty ? " " : draft.text).utf8), operationID: draft.recoveryID)
+                pendingNotes.removeValue(forKey: id)
+            } catch { storeFailed(error); return }
+        }
+        reloadNotebook()
     }
 
     func startPrim(_ kit: PrimKit) {
@@ -681,7 +696,9 @@ final class Board: ObservableObject {
             let expected: Data
             if let prior = pendingNotes[id]?.expected ?? cache.get(id) { expected = prior }
             else { expected = try store.readBlob(id: id) }
-            pendingNotes[id] = PendingNote(text: text, expected: expected)
+            var draft = pendingNotes[id] ?? PendingNote(text: text, expected: expected)
+            draft.text = text
+            pendingNotes[id] = draft
         } catch { storeFailed(error); return }
         noteTasks[id]?.cancel()
         noteTasks[id] = Task { [weak self] in

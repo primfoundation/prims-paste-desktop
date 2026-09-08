@@ -120,4 +120,16 @@ final class PrimLibraryTests: XCTestCase {
         XCTAssertThrowsError(try CLIParser.parse(["prim", "create", "primfoundation/person", "--version", "a", "--version", "b"]).get())
         XCTAssertEqual(try CLIParser.parse(["prim", "export", "id", "--to", "new"]).get(), .primExport(id: "id", destination: "new"))
     }
+
+    func testConflictedDraftCopyRetainsBothVersionsAndIsIdempotent() throws {
+        let dir = root(); defer { try? FileManager.default.removeItem(at: dir) }
+        let store = try NotebookStore(root: dir, key: SymmetricKey(size: .bits256))
+        let original = try store.add(kind: .note, plaintext: Data("other writer".utf8), at: .zero, size: .zero)
+        let operation = "draft_" + UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
+        let saved = try store.saveDraftCopy(sourceID: original.id, plaintext: Data("my pending edit".utf8), operationID: operation)
+        XCTAssertEqual(try store.saveDraftCopy(sourceID: original.id, plaintext: Data("my pending edit".utf8), operationID: operation), saved)
+        XCTAssertEqual(try store.readBlob(id: original.id), Data("other writer".utf8))
+        XCTAssertEqual(try store.readBlob(id: saved.id), Data("my pending edit".utf8))
+        XCTAssertEqual(try store.loadIndex().items.count, 2)
+    }
 }

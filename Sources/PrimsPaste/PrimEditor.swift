@@ -43,6 +43,7 @@ struct PrimEditor: View {
     @State private var raw = ""
     @State private var advanced = false
     @State private var error = ""
+    @State private var validationMessage = ""
 
     init(board: Board, session: Board.PrimSession) {
         self.board = board; self.session = session
@@ -71,12 +72,14 @@ struct PrimEditor: View {
                         TextEditor(text: $raw).font(.system(.body, design: .monospaced)).frame(minHeight: 220)
                     }
                     .onChange(of: advanced) { _, expanded in
-                        if expanded { raw = String(decoding: (try? record.encoded()) ?? Data(), as: UTF8.self) }
-                        else { applyJSON() }
+                        if expanded {
+                            if raw.isEmpty { raw = String(decoding: (try? record.encoded()) ?? Data(), as: UTF8.self) }
+                        } else if applyJSON() { raw = "" }
                     }
                 }.padding(.vertical, 8)
             }
             if !error.isEmpty { Text(error).font(.caption).foregroundStyle(.red).textSelection(.enabled) }
+            if error.isEmpty, !validationMessage.isEmpty { Text(validationMessage).font(.caption).foregroundStyle(.secondary) }
             HStack {
                 Button("Cancel") { board.primSession = nil }.keyboardShortcut(.cancelAction)
                 Spacer()
@@ -124,7 +127,7 @@ struct PrimEditor: View {
 
     @discardableResult private func check() -> Bool {
         if advanced && !applyJSON() { return false }
-        do { try session.kit.requireValid(record); error = "Structure and declared references checked."; return true }
+        do { try session.kit.requireValid(record); error = ""; validationMessage = "Structure and declared references checked."; return true }
         catch { self.error = error.localizedDescription; return false }
     }
 }
@@ -144,6 +147,8 @@ struct RecoverySheet: View {
             if board.pendingEditCount > 0 {
                 Text("\(board.pendingEditCount) pending note edits are held in this app session. Keep the app open until you save them.")
                 Button("Retry pending note saves") { board.retryPendingNotes() }
+                    .disabled(board.locked || board.recoveryNeeded)
+                Button("Save pending edits as separate notes") { board.savePendingCopies() }
                     .disabled(board.locked || board.recoveryNeeded)
             }
             Button("Save encrypted backup…") { backup() }.disabled(board.locked || board.recoveryNeeded)
