@@ -175,7 +175,10 @@ final class NotebookRecoveryTests: XCTestCase {
         let store = try NotebookStore(root: dir, key: SymmetricKey(size: .bits256))
         let item = try add(store)
         let backup = dir.appendingPathComponent("backup.pboard")
-        try store.writeBlob(id: item.id, plaintext: Data("different length".utf8))
+        // Simulate external corruption. The public writeBlob API now updates its
+        // corresponding metadata transactionally and cannot create this mismatch.
+        let altered = try CryptoBox.seal(plaintext: Data("different length".utf8), key: store.key)
+        try altered.write(to: store.blobURL(id: item.id))
         XCTAssertThrowsError(try store.exportBackup(to: backup))
         try FileManager.default.removeItem(at: store.blobURL(id: item.id))
         XCTAssertThrowsError(try store.exportBackup(to: backup))

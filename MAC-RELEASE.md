@@ -72,7 +72,10 @@ Daniel can paste this into his existing local agent:
    location, and Keychain service/account. Record exact old/new app paths and
    hashes. Installation remains an agent-operated step, not an implicit side
    effect of the build script.
-7. Perform installed acceptance locally: reopen the existing notebook using its
+7. Use matching journal-aware app and CLI binaries. Never delete an unresolved
+   `.transaction.enc` to bypass recovery, and preserve it with the complete store
+   if recovery is blocked. A failed save may have committed; reload and reconcile
+   before repeating an add. Perform installed acceptance locally: reopen the existing notebook using its
    original key; confirm item/tab preservation and encrypted-index migration;
    exercise a disposable local test card through GUI and matching CLI; create an
    encrypted backup to a new file and restore it into a separate new directory;
@@ -115,7 +118,7 @@ Never paste a `.p12`, `.p8`, password, or notebook key into chat or a repository
 
 | Area | Remaining work | Mac or access dependency |
 | --- | --- | --- |
-| Primboard storage | Multi-file crash journal and fault injection; guided recovery; explicit lost-key/portable recovery design; generic Convert to Prim | Coding and CI can proceed remotely; actual store/Keychain acceptance is local |
+| Primboard storage | Encrypted process-crash journal and fault injection implemented; physical power-loss/device and large-store performance validation remain; guided recovery, lost-key/portable recovery, and generic Convert to Prim remain | Coding and CI can proceed remotely; actual store/Keychain acceptance is local |
 | Primboard release | Intentional version/build, artifact publication and fresh-download acceptance; installed GUI/CLI and permission evidence | Company signing/notary access and local OS consent |
 | Shared Apple build system | Builder dispatch, hosted signed-release workflow, credential custody integration, durable logs/artifacts, first end-to-end release, Mac-offline proof | The infrastructure checkpoint is `planned_not_activated`; one-time authorized credential setup comes after the workflow is prepared |
 | Foundation Hub | Confirm real browser downloads, mobile/accessibility acceptance, production route/registry compatibility, operational ownership/budgets/alerts | Existing preview is live; production/account access must match the actual service |

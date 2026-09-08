@@ -1,4 +1,4 @@
-// File-backed encrypted notebook. Atomic index writes, 0700/0600 perms.
+// File-backed encrypted notebook. Journaled multi-file changes, 0700/0600 perms.
 // Blobs decrypt on demand. This store has no TTL.
 
 import Darwin
@@ -11,6 +11,7 @@ public final class NotebookStore: @unchecked Sendable {
     public let key: SymmetricKey
 
     let storeLock: StoreLock
+    var transactionCheckpoint: ((TransactionCheckpoint) throws -> Void)?
     private let fm = FileManager.default
     private let iso: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter()
@@ -50,18 +51,13 @@ public final class NotebookStore: @unchecked Sendable {
 
     public func loadIndex() throws -> NotebookIndex {
         return try storeLock.withLock {
-            guard fm.fileExists(atPath: indexURL.path) else {
+            try recoverPendingTransaction()
+            guard let data = try readRegularFile(indexURL, maximumBytes: IndexEnvelope.maximumBytes + 128) else {
                 if fm.fileExists(atPath: root.appendingPathComponent("index.migration.enc").path) {
                     throw NotebookError.indexCorrupt
                 }
                 return NotebookIndex()
             }
-            let attributes = try fm.attributesOfItem(atPath: indexURL.path)
-            guard attributes[.type] as? FileAttributeType == .typeRegular,
-                  ((attributes[.size] as? NSNumber)?.intValue ?? Int.max) <= IndexEnvelope.maximumBytes + 128 else {
-                throw NotebookError.indexCorrupt
-            }
-            let data = try Data(contentsOf: indexURL)
             do {
                 let plaintext = try IndexEnvelope.plaintext(data, key: key)
                 let index = try IndexEnvelope.decode(plaintext)
@@ -97,23 +93,14 @@ public final class NotebookStore: @unchecked Sendable {
 
     public func saveIndex(_ index: NotebookIndex) throws {
         return try storeLock.withLock {
-            let current = try loadIndex()
-            guard current.revision == index.revision, current.revision < UInt64.max else {
-                throw NotebookError.staleIndex
-            }
-            var next = index
-            next.revision += 1
-            let enc = JSONEncoder()
-            enc.outputFormatting = [.prettyPrinted, .sortedKeys]
-            enc.dateEncodingStrategy = .iso8601
-            let data = try enc.encode(next)
-            _ = try IndexEnvelope.decode(data)
-            try atomicWrite(IndexEnvelope.seal(data, key: key), to: indexURL, mode: 0o600)
+            try commit(index)
         }
     }
 
     public func readBlob(id: String) throws -> Data {
         return try storeLock.withLock {
+            guard IndexEnvelope.safeID(id) else { throw NotebookError.transactionInvalid }
+            try recoverPendingTransaction()
             let url = blobURL(id: id)
             guard fm.fileExists(atPath: url.path) else {
                 throw NotebookError.missingBlob(id)
@@ -125,14 +112,27 @@ public final class NotebookStore: @unchecked Sendable {
 
     public func writeBlob(id: String, plaintext: Data) throws {
         return try storeLock.withLock {
-            guard !plaintext.isEmpty else { throw NotebookError.emptyPayload }
-            let sealed = try CryptoBox.seal(plaintext: plaintext, key: key)
+            guard IndexEnvelope.safeID(id) else { throw NotebookError.transactionInvalid }
+            let index = try loadIndex()
+            if index.items.contains(where: { $0.id == id }) {
+                _ = try updatePayload(id, plaintext: plaintext)
+                return
+            }
+            try validateRawNames(["\(id).enc"], index: index)
+            let sealed = try sealTransactionBlob(plaintext)
             try atomicWrite(sealed, to: blobURL(id: id), mode: 0o600)
         }
     }
 
     public func deleteBlob(id: String) throws {
         return try storeLock.withLock {
+            guard IndexEnvelope.safeID(id) else { throw NotebookError.transactionInvalid }
+            let index = try loadIndex()
+            if index.items.contains(where: { $0.id == id }) {
+                try remove(id)
+                return
+            }
+            try validateRawNames(["\(id).enc", "\(id)-img.enc"], index: index)
             let url = blobURL(id: id)
             if fm.fileExists(atPath: url.path) {
                 try fm.removeItem(at: url)
@@ -141,25 +141,25 @@ public final class NotebookStore: @unchecked Sendable {
             if fm.fileExists(atPath: img.path) {
                 try fm.removeItem(at: img)
             }
+            try syncDirectory(blobsDir)
         }
     }
 
     public func writeImage(_ id: String, png: Data) throws {
         return try storeLock.withLock {
-            guard !png.isEmpty else { throw NotebookError.emptyPayload }
-            let sealed = try CryptoBox.seal(plaintext: png, key: key)
-            try atomicWrite(sealed, to: imageURL(id: id), mode: 0o600)
             var index = try loadIndex()
-            if let i = index.items.firstIndex(where: { $0.id == id }) {
-                index.items[i].hasImage = true
-                index.items[i].updatedAt = Date()
-                try saveIndex(index)
-            }
+            guard let i = index.items.firstIndex(where: { $0.id == id }) else { throw NotebookError.missingBlob(id) }
+            let sealed = try sealTransactionBlob(png)
+            index.items[i].hasImage = true
+            index.items[i].updatedAt = Date()
+            try commit(index, writes: ["\(id)-img.enc": sealed])
         }
     }
 
     public func readImage(_ id: String) throws -> Data? {
         return try storeLock.withLock {
+            guard IndexEnvelope.safeID(id) else { throw NotebookError.transactionInvalid }
+            try recoverPendingTransaction()
             let url = imageURL(id: id)
             guard fm.fileExists(atPath: url.path) else { return nil }
             return try CryptoBox.open(blob: try Data(contentsOf: url), key: key)
@@ -185,7 +185,7 @@ public final class NotebookStore: @unchecked Sendable {
             let made = createdAt ?? now
             let id = "pp_" + UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
             var index = try loadIndex()
-            try writeBlob(id: id, plaintext: plaintext)
+            let sealed = try sealTransactionBlob(plaintext)
             let meta = ItemMeta(
                 id: id,
                 kind: kind,
@@ -205,7 +205,7 @@ public final class NotebookStore: @unchecked Sendable {
                 z: z
             )
             index.items.append(meta)
-            try saveIndex(index)
+            try commit(index, writes: ["\(id).enc": sealed])
             return meta
         }
     }
@@ -229,13 +229,13 @@ public final class NotebookStore: @unchecked Sendable {
             guard let i = index.items.firstIndex(where: { $0.id == id }) else {
                 throw NotebookError.missingBlob(id)
             }
-            try writeBlob(id: id, plaintext: plaintext)
+            let sealed = try sealTransactionBlob(plaintext)
             index.items[i].bytes = plaintext.count
             index.items[i].updatedAt = Date()
             if index.items[i].kind == .paste {
                 index.items[i].fingerprint = CryptoBox.fingerprint(plaintext)
             }
-            try saveIndex(index)
+            try commit(index, writes: ["\(id).enc": sealed])
             return index.items[i]
         }
     }
@@ -330,15 +330,18 @@ public final class NotebookStore: @unchecked Sendable {
 
     public func seedBugs() throws {
         return try storeLock.withLock {
-            _ = try ensureTab(id: Bugs.tabID, title: Bugs.tabTitle, colorHex: Bugs.tabColor)
             var index = try loadIndex()
+            if !index.tabs.contains(where: { $0.id == Bugs.tabID }) {
+                index.tabs.append(BoardTab(id: Bugs.tabID, title: Bugs.tabTitle, colorHex: Bugs.tabColor))
+            }
+            var writes: [String: Data] = [:]
             var x: Double = 40
             var y: Double = 40
             for bug in Bugs.all {
                 if index.items.contains(where: { $0.id == bug.bugStickyID }) { continue }
                 let body = Data(bug.body.utf8)
                 guard !body.isEmpty else { continue }
-                try writeBlob(id: bug.bugStickyID, plaintext: body)
+                writes["\(bug.bugStickyID).enc"] = try sealTransactionBlob(body)
                 let now = Date()
                 index.items.append(
                     ItemMeta(
@@ -362,7 +365,7 @@ public final class NotebookStore: @unchecked Sendable {
                     y += 250
                 }
             }
-            try saveIndex(index)
+            try commit(index, writes: writes)
         }
     }
 
@@ -377,6 +380,7 @@ public final class NotebookStore: @unchecked Sendable {
     public func seedFeaturesWanted() throws {
         return try storeLock.withLock {
             var index = try loadIndex()
+            var writes: [String: Data] = [:]
             if !index.tabs.contains(where: { $0.id == FeaturesWanted.tabID }) {
                 index.tabs.insert(
                     BoardTab(
@@ -394,7 +398,7 @@ public final class NotebookStore: @unchecked Sendable {
                 let body = Data(f.body.utf8)
                 guard !body.isEmpty else { continue }
                 let now = Date()
-                try writeBlob(id: f.stickyID, plaintext: body)
+                writes["\(f.stickyID).enc"] = try sealTransactionBlob(body)
                 index.items.append(
                     ItemMeta(
                         id: f.stickyID,
@@ -418,16 +422,16 @@ public final class NotebookStore: @unchecked Sendable {
                 }
             }
             index.seededFeaturesWanted = true
-            try saveIndex(index)
+            try commit(index, writes: writes)
         }
     }
 
     public func remove(_ id: String) throws {
         return try storeLock.withLock {
             var index = try loadIndex()
+            guard index.items.contains(where: { $0.id == id }) else { return }
             index.items.removeAll { $0.id == id }
             try saveIndex(index)
-            try deleteBlob(id: id)
         }
     }
 
@@ -460,5 +464,8 @@ public final class NotebookStore: @unchecked Sendable {
         guard directory >= 0 else { throw StoreLock.posixError() }
         defer { Darwin.close(directory) }
         guard fsync(directory) == 0 else { throw StoreLock.posixError() }
+        // macOS fsync alone does not flush volatile device caches. Require the
+        // stronger barrier after both file data and the directory entry are synced.
+        guard fcntl(fd, F_FULLFSYNC) == 0 else { throw StoreLock.posixError() }
     }
 }
