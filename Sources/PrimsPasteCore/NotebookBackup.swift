@@ -67,7 +67,7 @@ extension NotebookStore {
                 _ = try CryptoBox.open(blob: blob, key: key)
             }
         }
-        guard expected == Set(snapshot.blobs.keys()) else { throw NotebookError.backupInvalid }
+        guard expected == Set(snapshot.blobs.keys) else { throw NotebookError.backupInvalid }
         let staging = destination.deletingLastPathComponent().appendingPathComponent(".primboard-restore-\(UUID().uuidString)")
         defer { try? fm.removeItem(at: staging) }
         let store = try NotebookStore(root: staging, key: key)
