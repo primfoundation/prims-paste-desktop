@@ -87,18 +87,22 @@ public enum PrimPack {
         return URL(fileURLWithPath: path)
     }
 
+    private static func requireDirectory(_ path: String) throws {
+        var current = path
+        while current != "/" {
+            let attributes = try FileManager.default.attributesOfItem(atPath: current)
+            guard attributes[.type] as? FileAttributeType == .typeDirectory else {
+                throw PrimLibraryError.invalid("Prim parent must be a real directory: \(current)")
+            }
+            current = (current as NSString).deletingLastPathComponent
+        }
+    }
+
     public static func write(record: PrimJSON, kit: PrimKit, to destination: URL) throws {
         try kit.requireValid(record)
         let fm = FileManager.default
         let target = localURL(destination)
-        var parent = (target.path as NSString).deletingLastPathComponent
-        while parent != "/" {
-            let attributes = try fm.attributesOfItem(atPath: parent)
-            guard attributes[.type] as? FileAttributeType == .typeDirectory else {
-                throw PrimLibraryError.invalid("Export parent must be a real directory: \(parent)")
-            }
-            parent = (parent as NSString).deletingLastPathComponent
-        }
+        try requireDirectory((target.path as NSString).deletingLastPathComponent)
         guard !fm.fileExists(atPath: target.path), (try? fm.destinationOfSymbolicLink(atPath: target.path)) == nil else {
             throw PrimLibraryError.invalid("Export requires a new folder.")
         }
@@ -126,8 +130,7 @@ public enum PrimPack {
 
     public static func read(_ source: URL, library: PrimLibrary) throws -> (PrimKit, PrimJSON) {
         let root = localURL(source)
-        guard try root.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey]).isDirectory == true,
-              root.resolvingSymlinksInPath().path == root.path else { throw PrimLibraryError.invalid("Choose a local Prim folder without symbolic links.") }
+        try requireDirectory(root.path)
         func read(_ name: String) throws -> Data {
             let url = root.appendingPathComponent(name)
             let a = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey])
