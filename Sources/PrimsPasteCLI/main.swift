@@ -33,7 +33,13 @@ enum PrimsPasteCLI {
             try proc.run()
             proc.waitUntilExit()
             if proc.terminationStatus != 0 { throw NotebookError.convert("open failed") }
-        case .tabs, .tabAdd, .add, .list, .convert, .bugsFile, .bugsTasks, .importSafepaste, .wantedSeed:
+        case .restore(let path, let destination):
+            guard let key = try KeychainKey.load() else {
+                throw NotebookError.keychain("the original notebook key is required to restore; no replacement key was created")
+            }
+            try NotebookStore.restoreBackup(from: URL(fileURLWithPath: path), to: URL(fileURLWithPath: destination), key: key)
+            print("Restored to a new directory. The active notebook is unchanged.")
+        case .tabs, .tabAdd, .add, .list, .convert, .bugsFile, .bugsTasks, .importSafepaste, .wantedSeed, .backup:
             let store = try notebook()
             try runStore(cmd, store: store)
         }
@@ -46,6 +52,9 @@ enum PrimsPasteCLI {
 
     static func runStore(_ cmd: CLICommand, store: NotebookStore) throws {
         switch cmd {
+        case .backup(let path):
+            try store.exportBackup(to: URL(fileURLWithPath: path))
+            print("Encrypted backup saved. Restore requires the existing notebook key.")
         case .tabs:
             let idx = try store.loadIndex()
             if idx.tabs.isEmpty { print("(no tabs)"); return }

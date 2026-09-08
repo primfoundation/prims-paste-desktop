@@ -46,7 +46,14 @@ final class ConvertTests: XCTestCase {
         XCTAssertEqual(done.conversion?.ref, "docket:/tmp#TASK-0001")
         let text = String(data: try Data(contentsOf: store.indexURL), encoding: .utf8) ?? ""
         XCTAssertFalse(text.contains("sk-live-do-not-send-to-docket"))
-        XCTAssertTrue(text.contains("invoice follow-up"))
+        XCTAssertFalse(text.contains("invoice follow-up"))
+        XCTAssertFalse(text.contains("docket:/tmp#TASK-0001"))
+        let persisted = try XCTUnwrap(try store.loadIndex().items.first?.conversion)
+        XCTAssertEqual(persisted.target, conv.target)
+        XCTAssertEqual(persisted.ref, conv.ref)
+        XCTAssertEqual(persisted.title, conv.title)
+        // The existing ISO-8601 index encoding retains whole seconds.
+        XCTAssertEqual(persisted.createdAt.timeIntervalSince1970, conv.createdAt.timeIntervalSince1970, accuracy: 1)
         XCTAssertEqual(try store.readBlob(id: meta.id), Data("sk-live-do-not-send-to-docket".utf8))
     }
 

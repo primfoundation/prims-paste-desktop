@@ -233,6 +233,8 @@ public enum NotebookError: Error, Equatable, CustomStringConvertible {
     case missingBlob(String)
     case indexCorrupt
     case staleIndex
+    case backupInvalid
+    case restoreDestinationExists
     case keychain(String)
     case emptyPayload
     case convert(String)
@@ -243,6 +245,8 @@ public enum NotebookError: Error, Equatable, CustomStringConvertible {
         case .missingBlob(let id): return "missing blob for \(id)"
         case .indexCorrupt: return "notebook index is corrupt"
         case .staleIndex: return "notebook changed; reload before saving"
+        case .backupInvalid: return "backup is incomplete, corrupt, or exceeds the supported size"
+        case .restoreDestinationExists: return "restore requires a new directory; the existing notebook was not changed"
         case .keychain(let s): return "keychain: \(s)"
         case .emptyPayload: return "empty payload"
         case .convert(let s): return s

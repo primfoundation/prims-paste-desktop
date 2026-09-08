@@ -18,10 +18,10 @@ A future change to any of these needs a migration, rollback and real-Mac proof.
 ## P0 stabilization gates
 
 1. **Development state is not user state.** Normal product unlock must not seed `FeaturesWanted`/`Bugs` into a new user notebook. Existing seeded cards are preserved; no migration deletes user data. Developer/demo fixtures must use an explicit mode and isolated notebook root.
-2. **Index confidentiality.** Payload blobs are encrypted, but the current index can contain captions, tab names, timestamps, key classification and conversion refs. Define and test a versioned encrypted-index migration before describing the whole notebook as metadata-private.
+2. **Index confidentiality.** The encrypted-index migration below protects captions, tab names, timestamps, key classification and conversion refs in the current index. Signed existing-store migration acceptance and independent security review remain required.
 3. **Concurrent writers.** App and CLI share one store. Replace uncoordinated read-modify-write with interprocess transaction/lock semantics and stale-writer tests.
 4. **Crash consistency.** Prove replacement of index/blob state cannot expose a missing-current-file window; preserve recoverable prior state where necessary.
-5. **Backup/recovery.** Add encrypted export/restore, integrity checks, corruption UX and explicit lost-key behavior.
+5. **Backup/recovery.** The CLI export/restore below adds authenticated recovery to a separate directory. A guided GUI recovery flow and real-Mac recovery acceptance remain open.
 6. **Security boundary.** Document Touch ID as the app opening gate and Keychain accessibility as the storage-key boundary used by both GUI and CLI. Test what the CLI can do while the app is closed/locked.
 7. **Generic conversion.** Add `Convert to Prim…` using a pinned Foundation Library definition, local schema/template population and a backlink. Never copy a secret payload by default.
 8. **Signed Mac acceptance.** Build/sign/install, existing-store reopen, Keychain reuse, Accessibility, Screen Recording, camera/microphone, screen-sharing protection and CLI access must be proven on a real Mac before stable release.
@@ -63,7 +63,53 @@ Tests cover independent writers, lost-update rejection, legacy index reads,
 old-reader validity, permissions, temporary-file cleanup and lock symlink rejection.
 Mac CI is the build/test gate for these Swift changes.
 
-This is file-level atomicity and cooperative transaction locking. It does not yet
-provide a journal spanning blob/index updates, encrypted index migration, encrypted
-backup/restore, power-loss fault injection, or signed-Mac/TCC release acceptance.
-Those remain separate open G3 gates.
+This is file-level atomicity and cooperative transaction locking. A journal spanning
+blob/index updates, power-loss fault injection, and signed-Mac/TCC release acceptance
+remain separate open G3 gates.
+
+## Encrypted index and recovery checkpoint — 2026-09-08
+
+The existing `index.json` path now contains a `PPI3` binary envelope around an
+authenticated AES-GCM payload. The decrypted model still reads notebook versions
+1 and 2. No bundle, CLI, store, item, tab, or Keychain identity changes. Old JSON-only
+readers fail on this envelope; update the app and CLI together before using this
+store format. Do not run an older binary against a migrated notebook.
+
+On first successful legacy read, the store validates the model and authenticates
+its referenced payloads with the existing key. It then saves the exact original
+index bytes, encrypted, as `index.migration.enc` before replacing the active index.
+An existing different migration backup is retained and another uniquely named
+encrypted copy is written. Corrupt indexes, wrong keys, missing referenced legacy
+payloads, unsafe IDs and ambiguous body/image filenames fail without rewriting the
+index. A missing active index after migration is an error, not an empty board.
+This protects current files; it does not promise secure erasure of historical
+plaintext disk blocks, snapshots or external backups. File names, counts, sizes
+and filesystem timestamps remain observable.
+
+```sh
+prims-paste backup /path/to/new-backup.pboard
+prims-paste restore /path/to/new-backup.pboard --to /path/to/new-notebook
+```
+
+Export holds the shared store lock, authenticates all referenced text/image blobs,
+checks payload sizes, and writes a private authenticated archive exclusively. It
+will not replace an existing file. The snapshot includes the encrypted index and
+referenced encrypted blobs; unrelated files and migration history are excluded.
+The archive contains no key. Restore requires the original `sh.prims.paste` /
+`notebook-aes-256` Keychain key and will not create a replacement key if it is
+missing. A lost key means this backup cannot be decrypted; this is not a portable
+key-recovery system or a cross-Mac transfer feature.
+
+Restore authenticates and validates the entire snapshot, rejects missing or extra
+blobs, then writes a private staging directory and publishes it to a new directory.
+The active notebook is never replaced by this command. Inspect the restored copy
+before any separately planned store cutover. Export supports up to 128 MiB of
+sealed source files; restore accepts archives up to 256 MiB. Larger stores need a
+future streaming archive design. The operation is a locked consistent snapshot,
+not a repair mechanism for an already inconsistent blob/index transaction.
+
+Recovery tests cover metadata confidentiality, exact legacy migration preservation,
+wrong keys, tampering, old-reader failure, payload/image round trips, private
+permissions, non-overwrite behavior, missing/extra data and unsafe path collisions.
+Mac CI verifies the implementation. Signing, TCC, actual Keychain reuse and
+existing-user acceptance still require the signed real-Mac release gate.
