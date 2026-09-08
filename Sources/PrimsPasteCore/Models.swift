@@ -58,6 +58,9 @@ public struct ItemMeta: Codable, Identifiable, Equatable, Sendable {
     public var conversion: Conversion?
     /// Encrypted PNG beside the text blob (`id-img.enc`). Notes can hold a picture.
     public var hasImage: Bool
+    /// An encrypted local record created from an exact Library definition.
+    public var primPin: PrimDefinitionPin?
+    public var primSourceID: String?
 
     public init(
         id: String,
@@ -77,7 +80,9 @@ public struct ItemMeta: Codable, Identifiable, Equatable, Sendable {
         tabID: String? = nil,
         z: Int = 0,
         conversion: Conversion? = nil,
-        hasImage: Bool = false
+        hasImage: Bool = false,
+        primPin: PrimDefinitionPin? = nil,
+        primSourceID: String? = nil
     ) {
         self.id = id
         self.kind = kind
@@ -98,6 +103,8 @@ public struct ItemMeta: Codable, Identifiable, Equatable, Sendable {
         self.z = z
         self.conversion = conversion
         self.hasImage = hasImage
+        self.primPin = primPin
+        self.primSourceID = primSourceID
     }
 
     public init(from decoder: Decoder) throws {
@@ -122,11 +129,14 @@ public struct ItemMeta: Codable, Identifiable, Equatable, Sendable {
         z = try c.decodeIfPresent(Int.self, forKey: .z) ?? 0
         conversion = try c.decodeIfPresent(Conversion.self, forKey: .conversion)
         hasImage = try c.decodeIfPresent(Bool.self, forKey: .hasImage) ?? false
+        primPin = try c.decodeIfPresent(PrimDefinitionPin.self, forKey: .primPin)
+        primSourceID = try c.decodeIfPresent(String.self, forKey: .primSourceID)
     }
 
     enum CodingKeys: String, CodingKey {
         case id, kind, x, y, width, height, createdAt, updatedAt, bytes, fingerprint
         case caption, description, looksLikeKey, keyKind, day, tabID, z, conversion, hasImage
+        case primPin, primSourceID
     }
 
     public static func dayString(from date: Date, calendar: Calendar = .current) -> String {
@@ -163,6 +173,8 @@ public struct ItemMeta: Codable, Identifiable, Equatable, Sendable {
         try c.encode(z, forKey: .z)
         try c.encodeIfPresent(conversion, forKey: .conversion)
         try c.encode(hasImage, forKey: .hasImage)
+        try c.encodeIfPresent(primPin, forKey: .primPin)
+        try c.encodeIfPresent(primSourceID, forKey: .primSourceID)
     }
 }
 

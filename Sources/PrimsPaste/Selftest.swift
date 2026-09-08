@@ -47,6 +47,20 @@ enum Selftest {
 
         check("does not touch CLI index path in store root", true)
 
+        do {
+            let library = try PrimLibrary.bundled()
+            let store = try NotebookStore(root: dir.appendingPathComponent("native-prims"), key: SymmetricKey(size: .bits256))
+            for kit in library.kits {
+                let record = try kit.draft(title: "Synthetic selftest record")
+                let operation = "prim_" + UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
+                let item = try store.createPrim(sourceID: nil, kit: kit, record: record, operationID: operation)
+                let target = dir.appendingPathComponent(operation + ".prim")
+                try store.exportPrim(item.id, library: library, to: target)
+                let (loaded, reopened) = try PrimPack.read(target, library: library)
+                check("native encrypted create/export/reopen \(kit.pin.profileID)", loaded.pin == kit.pin && reopened == record)
+            }
+        } catch { check("native Prim workflow threw \(error)", false) }
+
         let openai = KeyDetector.inspect("sk-proj-abcdefghijklmnopqrstuvwxyz0123456789ABCD")
         check("openai key detected", openai.isKey && openai.kind == "openai")
         let prose = KeyDetector.inspect("The API key is in 1Password, not here.")

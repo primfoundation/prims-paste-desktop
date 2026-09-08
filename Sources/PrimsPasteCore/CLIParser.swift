@@ -16,6 +16,11 @@ public enum CLICommand: Equatable, Sendable {
     case wantedSeed
     case backup(path: String)
     case restore(path: String, destination: String)
+    case profiles
+    case primCreate(profile: String, version: String, source: String?, input: String?, operation: String?)
+    case primValidate(id: String)
+    case primExport(id: String, destination: String)
+    case primImport(path: String)
 }
 
 public struct CLIUsage: Error, Equatable, Sendable {
@@ -38,12 +43,38 @@ public enum CLIParser {
       prims-paste wanted
       prims-paste backup <new-file.pboard>
       prims-paste restore <file.pboard> --to <new-directory>
+      prims-paste profiles
+      prims-paste prim create <namespace/name> --version <exact-version> [--from <sticky-id>] [--input <record.json>] [--operation <prim_32hex>]
+      prims-paste prim validate <id>
+      prims-paste prim export <id> --to <new-folder>
+      prims-paste prim import <folder>
     """
 
     public static func parse(_ argv: [String]) -> Result<CLICommand, CLIUsage> {
         guard let cmd = argv.first else { return .failure(CLIUsage(usage)) }
         let rest = Array(argv.dropFirst())
         switch cmd {
+        case "profiles":
+            guard rest.isEmpty else { return .failure(CLIUsage("usage: prims-paste profiles")) }
+            return .success(.profiles)
+        case "prim":
+            if rest.count == 2 && rest[0] == "validate" { return .success(.primValidate(id: rest[1])) }
+            if rest.count == 2 && rest[0] == "import" { return .success(.primImport(path: rest[1])) }
+            if rest.count == 4 && rest[0] == "export" && rest[2] == "--to" { return .success(.primExport(id: rest[1], destination: rest[3])) }
+            if rest.count >= 4 && rest[0] == "create" {
+                var flags: [String: String] = [:]
+                let pairs = Array(rest.dropFirst(2))
+                guard pairs.count % 2 == 0 else { return .failure(CLIUsage("Prim creation requires flag/value pairs.")) }
+                for i in stride(from: 0, to: pairs.count, by: 2) {
+                    guard ["--version", "--from", "--input", "--operation"].contains(pairs[i]), flags[pairs[i]] == nil else {
+                        return .failure(CLIUsage("Unknown or repeated Prim creation option."))
+                    }
+                    flags[pairs[i]] = pairs[i + 1]
+                }
+                guard let version = flags["--version"] else { return .failure(CLIUsage("An exact --version is required.")) }
+                return .success(.primCreate(profile: rest[1], version: version, source: flags["--from"], input: flags["--input"], operation: flags["--operation"]))
+            }
+            return .failure(CLIUsage(usage))
         case "help", "-h", "--help":
             return .success(CLICommand.help)
         case "open":

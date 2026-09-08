@@ -27,6 +27,10 @@ Convert: Docket via `docket-prim task-create` into `~/.prims-paste/docket/`; Pas
 
 CLI (same store as the app):
 
+Native encrypted Prim creation, editing, import/export and guided recovery are
+described in [PRIM-WORKFLOW.md](PRIM-WORKFLOW.md). These source changes require the
+updated app and CLI; signed installed acceptance is tracked separately.
+
 ```bash
 prims-paste help
 prims-paste open
