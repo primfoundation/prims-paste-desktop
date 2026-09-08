@@ -46,7 +46,9 @@ final class ConvertTests: XCTestCase {
         XCTAssertEqual(done.conversion?.ref, "docket:/tmp#TASK-0001")
         let text = String(data: try Data(contentsOf: store.indexURL), encoding: .utf8) ?? ""
         XCTAssertFalse(text.contains("sk-live-do-not-send-to-docket"))
-        XCTAssertTrue(text.contains("invoice follow-up"))
+        XCTAssertFalse(text.contains("invoice follow-up"))
+        XCTAssertFalse(text.contains("docket:/tmp#TASK-0001"))
+        XCTAssertEqual(try store.loadIndex().items.first?.conversion, conv)
         XCTAssertEqual(try store.readBlob(id: meta.id), Data("sk-live-do-not-send-to-docket".utf8))
     }
 
