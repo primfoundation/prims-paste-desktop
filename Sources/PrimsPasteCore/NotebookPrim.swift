@@ -78,7 +78,8 @@ public enum PrimPack {
         // macOS exposes temporary folders through OS-owned aliases.
         // Arbitrary user-created symlinks remain rejected below.
         for alias in ["/var", "/tmp"] where path.hasPrefix(alias + "/") {
-            if (try? FileManager.default.destinationOfSymbolicLink(atPath: alias)) == "/private" + alias {
+            let link = try? FileManager.default.destinationOfSymbolicLink(atPath: alias)
+            if link == "/private" + alias || link == "private" + alias {
                 path = "/private" + path
                 break
             }
@@ -94,7 +95,7 @@ public enum PrimPack {
         while parent != "/" {
             let attributes = try fm.attributesOfItem(atPath: parent)
             guard attributes[.type] as? FileAttributeType == .typeDirectory else {
-                throw PrimLibraryError.invalid("Choose a local folder without symbolic links.")
+                throw PrimLibraryError.invalid("Export parent must be a real directory: \(parent)")
             }
             parent = (parent as NSString).deletingLastPathComponent
         }
