@@ -16,7 +16,11 @@ Encrypted sticky board for this Mac. Touch ID to open. Not SafePaste; no CLI bro
 ./scripts/build.sh
 ```
 
-Signed `Developer ID Application: Eidos AGI LLC (Y6CQ4SWPWM)`.
+Builds a separate candidate signed as
+`Developer ID Application: Eidos AGI LLC (Y6CQ4SWPWM)` after checking usable signing
+access. It does **not** replace the installed app, update the CLI link, or open the
+notebook. See [MAC-RELEASE.md](MAC-RELEASE.md) for notarization, the local-agent work
+order, protected installation, and the remaining release gates.
 
 Store: `~/.prims-paste/notebook/` (AES-GCM, key in login keychain).  
 Convert: Docket via `docket-prim task-create` into `~/.prims-paste/docket/`; Paseo via `paseo run`.
