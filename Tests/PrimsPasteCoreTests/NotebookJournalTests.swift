@@ -202,6 +202,12 @@ final class NotebookJournalTests: XCTestCase {
         var wrongInnerKey = transaction
         wrongInnerKey.writes["\(meta.id).enc"] = try CryptoBox.seal(plaintext: newBody, key: SymmetricKey(size: .bits256))
         fixtures.append(try TransactionJournal.seal(wrongInnerKey, key: key))
+        var wrongLength = transaction
+        wrongLength.writes["\(meta.id).enc"] = try CryptoBox.seal(plaintext: Data("short".utf8), key: key)
+        fixtures.append(try TransactionJournal.seal(wrongLength, key: key))
+        var wrongFingerprint = transaction
+        wrongFingerprint.writes["\(meta.id).enc"] = try CryptoBox.seal(plaintext: Data(repeating: 65, count: newBody.count), key: key)
+        fixtures.append(try TransactionJournal.seal(wrongFingerprint, key: key))
         for fixture in fixtures {
             try fixture.write(to: store.journalURL)
             let reopened = try NotebookStore(root: store.root, key: key)
@@ -281,6 +287,31 @@ final class NotebookJournalTests: XCTestCase {
         renamed.items[0].id = meta.id.uppercased()
         XCTAssertThrowsError(try store.saveIndex(renamed))
         XCTAssertEqual(try store.readBlob(id: meta.id), oldBody)
+    }
+
+    func testDeletingItemPreservesAnotherItemsImageShapedBody() throws {
+        let store = try NotebookStore(root: root(), key: key)
+        let meta = try item(store), secondID = meta.id + "-img"
+        try store.writeBlob(id: secondID, plaintext: oldBody)
+        var index = try store.loadIndex()
+        var second = meta; second.id = secondID
+        index.items.append(second)
+        try store.saveIndex(index)
+        try store.remove(meta.id)
+        try assertRecovered(store, id: secondID, revision: 3, body: oldBody)
+    }
+
+    func testLegacyDerivedTabsHaveStableSourceBasedCreationDates() throws {
+        let store = try NotebookStore(root: root(), key: key)
+        let meta = try item(store)
+        var index = try store.loadIndex(); index.tabs = []
+        let encoder = JSONEncoder(); encoder.dateEncodingStrategy = .iso8601
+        let bytes = try encoder.encode(index)
+        let decoded = try IndexEnvelope.decode(bytes)
+        XCTAssertEqual(try IndexEnvelope.decode(bytes), decoded)
+        XCTAssertEqual(decoded.tabs.first { $0.id == meta.tabID }?.createdAt, decoded.items[0].createdAt)
+        let empty = try IndexEnvelope.decode(Data(#"{"version":2,"items":[],"tabs":[]}"#.utf8))
+        XCTAssertEqual(empty.tabs[0].createdAt, Date(timeIntervalSince1970: 0))
     }
 
     func testAbruptProcessExitReleasesLockAndRecoversCommittedChange() throws {

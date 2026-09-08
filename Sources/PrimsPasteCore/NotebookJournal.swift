@@ -91,17 +91,25 @@ extension NotebookStore {
         }
         var next = proposed
         next.revision += 1
+        // Persist derived tabs once, so reads do not synthesize fresh metadata.
+        if next.tabs.isEmpty { next.tabs = NotebookIndex.tabsFromDays(next.items) }
         let encoder = JSONEncoder(); encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         encoder.dateEncodingStrategy = .iso8601
         let payload = try encoder.encode(next)
         _ = try IndexEnvelope.decode(payload)
         var writes = supplied
+        var capturedBytes = 0
+        for data in writes.values {
+            guard data.count <= TransactionJournal.maximumWriteBytes - capturedBytes else { throw NotebookError.transactionTooLarge }
+            capturedBytes += data.count
+        }
         // Whole-index callers can reference a previously written, unreferenced blob.
         // Capture such data in the redo record before publishing the new reference.
         for name in TransactionJournal.requiredWrites(from: previous, to: next).subtracting(Set(writes.keys)) {
-            guard let data = try readRegularFile(blobsDir.appendingPathComponent(name), maximumBytes: TransactionJournal.maximumWriteBytes) else {
+            guard let data = try readRegularFile(blobsDir.appendingPathComponent(name), maximumBytes: TransactionJournal.maximumWriteBytes - capturedBytes) else {
                 throw NotebookError.transactionInvalid
             }
+            capturedBytes += data.count
             writes[name] = data
         }
         let transaction = NotebookTransaction(
@@ -207,7 +215,7 @@ extension NotebookStore {
         var attributes = stat()
         guard fstat(fd, &attributes) == 0 else { throw StoreLock.posixError() }
         guard attributes.st_mode & S_IFMT == S_IFREG, attributes.st_size >= 0,
-              attributes.st_size <= maximumBytes else { throw NotebookError.transactionInvalid }
+              attributes.st_size <= Int64(maximumBytes) else { throw NotebookError.transactionInvalid }
         var data = Data()
         var buffer = [UInt8](repeating: 0, count: 64 * 1024)
         while true {

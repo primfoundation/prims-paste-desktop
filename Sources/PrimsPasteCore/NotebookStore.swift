@@ -1,4 +1,4 @@
-// File-backed encrypted notebook. Atomic index writes, 0700/0600 perms.
+// File-backed encrypted notebook. Journaled multi-file changes, 0700/0600 perms.
 // Blobs decrypt on demand. This store has no TTL.
 
 import Darwin

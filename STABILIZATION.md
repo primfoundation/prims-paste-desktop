@@ -19,8 +19,8 @@ A future change to any of these needs a migration, rollback and real-Mac proof.
 
 1. **Development state is not user state.** Normal product unlock must not seed `FeaturesWanted`/`Bugs` into a new user notebook. Existing seeded cards are preserved; no migration deletes user data. Developer/demo fixtures must use an explicit mode and isolated notebook root.
 2. **Index confidentiality.** The encrypted-index migration below protects captions, tab names, timestamps, key classification and conversion refs in the current index. Signed existing-store migration acceptance and independent security review remain required.
-3. **Concurrent writers.** App and CLI share one store. Replace uncoordinated read-modify-write with interprocess transaction/lock semantics and stale-writer tests.
-4. **Crash consistency.** Prove replacement of index/blob state cannot expose a missing-current-file window; preserve recoverable prior state where necessary.
+3. **Concurrent writers.** App and CLI share the interprocess lock/revision contract described below. Keep both executables on the same journal-aware version; installed multi-process acceptance remains a release gate.
+4. **Crash consistency.** The encrypted redo journal below coordinates referenced index/blob changes and replays interrupted operations. Physical power-loss/storage-device validation and independent review remain open.
 5. **Backup/recovery.** The CLI export/restore below adds authenticated recovery to a separate directory. A guided GUI recovery flow and real-Mac recovery acceptance remain open.
 6. **Security boundary.** Document Touch ID as the app opening gate and Keychain accessibility as the storage-key boundary used by both GUI and CLI. Test what the CLI can do while the app is closed/locked.
 7. **Generic conversion.** Add `Convert to Prim…` using a pinned Foundation Library definition, local schema/template population and a backlink. Never copy a secret payload by default.
@@ -63,9 +63,9 @@ Tests cover independent writers, lost-update rejection, legacy index reads,
 old-reader validity, permissions, temporary-file cleanup and lock symlink rejection.
 Mac CI is the build/test gate for these Swift changes.
 
-This is file-level atomicity and cooperative transaction locking. A journal spanning
-blob/index updates, power-loss fault injection, and signed-Mac/TCC release acceptance
-remain separate open G3 gates.
+This checkpoint established file-level atomicity and cooperative transaction
+locking. The subsequent journal checkpoint below adds recovery across blob/index
+updates. Physical power-loss and signed-Mac/TCC acceptance remain open G3 gates.
 
 ## Encrypted index and recovery checkpoint — 2026-09-08
 
@@ -106,7 +106,8 @@ The active notebook is never replaced by this command. Inspect the restored copy
 before any separately planned store cutover. Export supports up to 128 MiB of
 sealed source files; restore accepts archives up to 256 MiB. Larger stores need a
 future streaming archive design. The operation is a locked consistent snapshot,
-not a repair mechanism for an already inconsistent blob/index transaction.
+not a repair mechanism for historical corruption or unrelated missing files.
+Export first replays a valid pending journal before capturing the snapshot.
 
 Recovery tests cover metadata confidentiality, exact legacy migration preservation,
 wrong keys, tampering, old-reader failure, payload/image round trips, private
@@ -129,3 +130,59 @@ and verifies the final unpacked artifact. `MAC-RELEASE.md` assigns the remaining
 local-agent work and preserves the matched pre-migration app/store rollback
 boundary. Mocked failure tests and macOS CI bundle selftest verify the tooling;
 they do not close live signing, notarization, installed-store, or TCC gates.
+
+## Encrypted crash journal — 2026-09-08
+
+Referenced changes now publish a private authenticated `.transaction.enc` record
+before replacing any blob or index. The `PPJ1` record contains the exact sealed
+previous and next indexes, sealed changed blobs, and precise obsolete-file names;
+the entire record is encrypted again with the existing notebook key. Publication
+is the commit point. A save that subsequently fails may have committed: reopen
+and reconcile the board before repeating an add or another user operation.
+
+Every index read, direct blob/image read, and mutation checks for recovery while
+holding the same interprocess store lock. Replay validates the entire record and
+affected paths before changing files, writes all changed blobs, publishes the
+matching index, removes only obsolete referenced blobs, then clears the journal.
+Replaying a partially completed replay is safe and does not advance the revision
+twice. A wrong key, tampered record, unexpected primary revision, unsafe path,
+symlink destination, inconsistent byte count/fingerprint, or ambiguous filename
+blocks recovery without deleting the record.
+
+Adds, payload edits, image attachment/replacement, removals, whole-index saves,
+and feature/bug seed batches use this protocol. Public `writeBlob` and `deleteBlob`
+calls on indexed items now update/remove the matching index transactionally;
+unreferenced raw blobs remain available for import assembly, with alias checks.
+`writeImage` requires an existing item. Case-only/Unicode-equivalent path renames
+are rejected, and removing one item cannot delete another item's image-shaped
+body filename. Product, bundle, CLI, Keychain, store, item and tab identities stay
+unchanged; the current index still uses `PPI3` and model versions 1/2.
+
+The journal supports up to 64 MiB of changed sealed blob data and 128 MiB of
+encoded journal data per transaction. Larger changes fail before journal
+publication; a streaming protocol is future work. Files/directories retain
+0600/0700 permissions. File data and directory entries are synced, and macOS
+`F_FULLFSYNC` is required before advancing durability boundaries; unsupported
+filesystems fail instead of silently weakening the barrier. This follows Apple's
+[fsync guidance](https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man2/fsync.2.html).
+
+`NotebookJournalTests` injects interruption at commit and cleanup boundaries and
+launches isolated XCTest subprocesses that exit abruptly without cleanup. The
+suite covers first-add recovery, payload/image/removal/batch replay, repeated
+recovery interruption, backup-after-recovery, stale writers, confidentiality,
+private permissions, malformed/authentication/path failures, oversize rejection,
+and filename collisions. These are process-crash and software fault tests, not
+physical power-loss proof, a signed release, real-notebook acceptance, or a
+substitute for independent security review. Disk exhaustion, device/filesystem
+failure matrices, large-store latency and GUI recovery presentation remain open.
+
+The recovery tests also exposed nondeterministic tab metadata: legacy indexes
+without explicit tabs generated a new tab creation time on every read. Derived
+tabs now use timestamps from their source items (epoch for an empty legacy
+notebook), and new commits persist their derived tabs. Explicit existing tabs
+and their creation dates are preserved.
+
+Older binaries do not understand this journal. Update app and CLI together; do
+not mix versions or delete `.transaction.enc` to bypass an error. Preserve the
+complete store (including an unresolved journal) for diagnosis. Pre-journal
+corruption, lost keys and arbitrary external file changes are not auto-repaired.

@@ -214,14 +214,21 @@ public struct NotebookIndex: Codable, Equatable, Sendable {
         var seen = Set<String>()
         var out: [BoardTab] = []
         let today = ItemMeta.today()
+        // Derived legacy tabs must not acquire a new creation timestamp on every read.
+        let fallbackDate = items.map(\.createdAt).min() ?? Date(timeIntervalSince1970: 0)
+        var createdByTab: [String: Date] = [:]
+        for item in items {
+            let id = item.tabID.isEmpty ? item.day : item.tabID
+            createdByTab[id] = min(createdByTab[id] ?? item.createdAt, item.createdAt)
+        }
         if !seen.contains(today) {
             seen.insert(today)
-            out.append(.todayTab())
+            out.append(BoardTab(id: today, title: "today", colorHex: "#3D3A36", createdAt: createdByTab[today] ?? fallbackDate))
         }
         for it in items {
             if seen.insert(it.tabID.isEmpty ? it.day : it.tabID).inserted {
                 let id = it.tabID.isEmpty ? it.day : it.tabID
-                out.append(BoardTab(id: id, title: id == today ? "today" : id, colorHex: "#6B645C"))
+                out.append(BoardTab(id: id, title: id == today ? "today" : id, colorHex: "#6B645C", createdAt: createdByTab[id] ?? fallbackDate))
             }
         }
         return out
