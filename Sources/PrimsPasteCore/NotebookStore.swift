@@ -10,7 +10,7 @@ public final class NotebookStore: @unchecked Sendable {
     public let root: URL
     public let key: SymmetricKey
 
-    private let storeLock: StoreLock
+    let storeLock: StoreLock
     private let fm = FileManager.default
     private let iso: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter()
@@ -51,13 +51,44 @@ public final class NotebookStore: @unchecked Sendable {
     public func loadIndex() throws -> NotebookIndex {
         return try storeLock.withLock {
             guard fm.fileExists(atPath: indexURL.path) else {
+                if fm.fileExists(atPath: root.appendingPathComponent("index.migration.enc").path) {
+                    throw NotebookError.indexCorrupt
+                }
                 return NotebookIndex()
             }
+            let attributes = try fm.attributesOfItem(atPath: indexURL.path)
+            guard attributes[.type] as? FileAttributeType == .typeRegular,
+                  ((attributes[.size] as? NSNumber)?.intValue ?? Int.max) <= IndexEnvelope.maximumBytes + 128 else {
+                throw NotebookError.indexCorrupt
+            }
             let data = try Data(contentsOf: indexURL)
-            let dec = JSONDecoder()
-            dec.dateDecodingStrategy = .iso8601
             do {
-                return try dec.decode(NotebookIndex.self, from: data)
+                let plaintext = try IndexEnvelope.plaintext(data, key: key)
+                let index = try IndexEnvelope.decode(plaintext)
+                if !data.starts(with: IndexEnvelope.magic) {
+                    // Prove this is the existing payload key before changing a legacy index.
+                    for item in index.items {
+                        let blob = try readBlob(id: item.id)
+                        guard blob.count == item.bytes else { throw NotebookError.indexCorrupt }
+                        if item.hasImage {
+                            guard try readImage(item.id) != nil else { throw NotebookError.indexCorrupt }
+                        }
+                    }
+                    // Preserve the exact old bytes, encrypted, before atomically replacing the index.
+                    let backup = root.appendingPathComponent("index.migration.enc")
+                    let sealed = try IndexEnvelope.seal(plaintext, key: key)
+                    if !fm.fileExists(atPath: backup.path) {
+                        try atomicWrite(sealed, to: backup, mode: 0o600, overwrite: false)
+                    } else {
+                        let previous = try Data(contentsOf: backup)
+                        if try IndexEnvelope.plaintext(previous, key: key) != plaintext {
+                            try atomicWrite(sealed, to: root.appendingPathComponent("index.migration-\(UUID().uuidString).enc"), mode: 0o600, overwrite: false)
+                        }
+                    }
+                    guard try IndexEnvelope.plaintext(sealed, key: key) == plaintext else { throw NotebookError.indexCorrupt }
+                    try atomicWrite(sealed, to: indexURL, mode: 0o600)
+                }
+                return index
             } catch {
                 throw NotebookError.indexCorrupt
             }
@@ -76,7 +107,8 @@ public final class NotebookStore: @unchecked Sendable {
             enc.outputFormatting = [.prettyPrinted, .sortedKeys]
             enc.dateEncodingStrategy = .iso8601
             let data = try enc.encode(next)
-            try atomicWrite(data, to: indexURL, mode: 0o600)
+            _ = try IndexEnvelope.decode(data)
+            try atomicWrite(IndexEnvelope.seal(data, key: key), to: indexURL, mode: 0o600)
         }
     }
 
@@ -152,8 +184,8 @@ public final class NotebookStore: @unchecked Sendable {
             let now = Date()
             let made = createdAt ?? now
             let id = "pp_" + UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
-            try writeBlob(id: id, plaintext: plaintext)
             var index = try loadIndex()
+            try writeBlob(id: id, plaintext: plaintext)
             let meta = ItemMeta(
                 id: id,
                 kind: kind,
@@ -399,7 +431,7 @@ public final class NotebookStore: @unchecked Sendable {
         }
     }
 
-    private func atomicWrite(_ data: Data, to url: URL, mode: Int) throws {
+    func atomicWrite(_ data: Data, to url: URL, mode: Int, overwrite: Bool = true) throws {
         let tmp = url.deletingLastPathComponent().appendingPathComponent(".write-" + UUID().uuidString)
         let fd = Darwin.open(tmp.path, O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC | O_NOFOLLOW, mode_t(mode))
         guard fd >= 0 else { throw StoreLock.posixError() }
@@ -418,7 +450,12 @@ public final class NotebookStore: @unchecked Sendable {
         }
         guard fsync(fd) == 0 else { throw StoreLock.posixError() }
         // rename replaces the directory entry atomically; the old file is never unlinked first.
-        guard Darwin.rename(tmp.path, url.path) == 0 else { throw StoreLock.posixError() }
+        if overwrite {
+            guard Darwin.rename(tmp.path, url.path) == 0 else { throw StoreLock.posixError() }
+        } else {
+            // Exclusive publication: never overwrite an existing backup, even in a race.
+            guard Darwin.link(tmp.path, url.path) == 0 else { throw StoreLock.posixError() }
+        }
         let directory = Darwin.open(url.deletingLastPathComponent().path, O_RDONLY | O_CLOEXEC)
         guard directory >= 0 else { throw StoreLock.posixError() }
         defer { Darwin.close(directory) }

@@ -58,7 +58,8 @@ final class NotebookTests: XCTestCase {
         let indexData = try Data(contentsOf: store.indexURL)
         let indexText = String(data: indexData, encoding: .utf8) ?? ""
         XCTAssertFalse(indexText.contains("sk-live-do-not-index"))
-        XCTAssertTrue(indexText.contains(meta.id))
+        XCTAssertFalse(indexText.contains(meta.id))
+        XCTAssertTrue(indexData.starts(with: IndexEnvelope.magic))
 
         let store2 = try NotebookStore(root: dir, key: key)
         let loaded = try store2.loadIndex()
@@ -142,7 +143,7 @@ final class NotebookTests: XCTestCase {
         XCTAssertEqual(updated.caption, "stripe prod")
         XCTAssertEqual(try store.readBlob(id: meta.id), secret)
         let indexText = String(data: try Data(contentsOf: store.indexURL), encoding: .utf8) ?? ""
-        XCTAssertTrue(indexText.contains("stripe prod"))
+        XCTAssertFalse(indexText.contains("stripe prod"))
         XCTAssertFalse(indexText.contains("sk-live-caption-must-not-replace-blob"))
     }
 

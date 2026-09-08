@@ -14,6 +14,8 @@ public enum CLICommand: Equatable, Sendable {
     case bugsTasks
     case importSafepaste
     case wantedSeed
+    case backup(path: String)
+    case restore(path: String, destination: String)
 }
 
 public struct CLIUsage: Error, Equatable, Sendable {
@@ -23,7 +25,7 @@ public struct CLIUsage: Error, Equatable, Sendable {
 
 public enum CLIParser {
     public static let usage = """
-    usage: prims-paste <open|tabs|tab|add|list|convert|bugs|import-safepaste|help> [args...]
+    usage: prims-paste <open|tabs|tab|add|list|convert|bugs|import-safepaste|wanted|backup|restore|help> [args...]
       prims-paste open
       prims-paste tabs
       prims-paste tab add <title> [--color #HEX]
@@ -34,6 +36,8 @@ public enum CLIParser {
       prims-paste bugs tasks
       prims-paste import-safepaste
       prims-paste wanted
+      prims-paste backup <new-file.pboard>
+      prims-paste restore <file.pboard> --to <new-directory>
     """
 
     public static func parse(_ argv: [String]) -> Result<CLICommand, CLIUsage> {
@@ -75,6 +79,12 @@ public enum CLIParser {
             return .success(CLICommand.importSafepaste)
         case "wanted":
             return .success(CLICommand.wantedSeed)
+        case "backup":
+            guard rest.count == 1 else { return .failure(CLIUsage("usage: prims-paste backup <new-file.pboard>")) }
+            return .success(.backup(path: rest[0]))
+        case "restore":
+            guard rest.count == 3, rest[1] == "--to" else { return .failure(CLIUsage("usage: prims-paste restore <file.pboard> --to <new-directory>")) }
+            return .success(.restore(path: rest[0], destination: rest[2]))
         default:
             return .failure(CLIUsage(usage))
         }
