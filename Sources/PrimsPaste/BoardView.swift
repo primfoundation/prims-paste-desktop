@@ -36,6 +36,9 @@ struct BoardView: View {
         .sheet(isPresented: $board.pasteSheet) { pasteSheet }
         .sheet(isPresented: $board.showSettings) { SettingsView(board: board) }
         .sheet(isPresented: $board.showNewTab) { NewTabSheet(board: board) }
+        .sheet(isPresented: $board.showPrimLibrary) { PrimLibrarySheet(board: board) }
+        .sheet(item: $board.primSession) { PrimEditor(board: board, session: $0) }
+        .onChange(of: board.reloadGeneration) { _, _ in noteDrafts.removeAll() }
         .sheet(item: $board.taskSession) { session in
             TaskEditor(board: board, stickyID: session.stickyID, card: session.card)
         }
@@ -71,12 +74,14 @@ struct BoardView: View {
             Spacer()
             tool("paste ⌘V") { board.dropClipboard() }
             tool("note") { board.dropNote() }
+            tool("create Prim") { board.showPrimLibrary = true; board.poke() }
             tool("audio") { startAudio() }
             tool("calendar") { withAnimation(.easeInOut(duration: 0.18)) { board.showCalendar.toggle() }; board.poke() }
             tool(board.shuttered ? "uncover" : "cover") {
                 Task { await board.toggleShutter() }
             }
             tool("settings") { board.showSettings = true; board.poke() }
+            tool("recovery") { board.showRecovery = true; board.poke() }
             tool("lock") { board.lockNotebook() }
         }
         .padding(.horizontal, 16)
@@ -290,8 +295,19 @@ struct BoardView: View {
         let changed: (CGSize, CGPoint) -> Void = { board.updateDrag(translation: $0, location: $1) }
         let ended = { board.endDrag() }
         let convert: (ConvertTarget) -> Void = { board.convert(item.id, to: $0) }
-        let open = { board.openTaskEditor(item.id) }
-        switch item.kind {
+        let open = { if item.primPin != nil { board.openPrim(item.id) } else { board.openTaskEditor(item.id) } }
+        if let pin = item.primPin {
+            StickyCard(item: item, selected: board.selectedID == item.id, listening: false,
+                       dragging: dragging, lift: lift,
+                       onSelect: { board.selectedID = item.id; board.poke() },
+                       onDelete: { board.delete(item.id) }, onDragBegin: begin,
+                       onDragChanged: changed, onDragEnded: ended, onConvert: convert, onOpen: open) {
+                Text(pin.profileID).font(.caption).foregroundStyle(.secondary)
+                Text(pin.version).font(.caption2).foregroundStyle(.secondary)
+                Button("Open Prim", action: open)
+                Button("Export local files…") { board.exportPrim(item.id) }
+            }
+        } else { switch item.kind {
         case .paste:
             PasteSticky(
                 item: item,
@@ -366,7 +382,7 @@ struct BoardView: View {
                 onConvert: convert,
                 onOpen: open
             )
-        }
+        } }
     }
 
     private func draftBinding(_ item: ItemMeta) -> Binding<String> {

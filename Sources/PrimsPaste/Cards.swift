@@ -29,13 +29,17 @@ struct StickyCard<Content: View>: View {
                     .foregroundStyle(Ink.mute)
                 Spacer()
                 Menu {
+                    if item.primPin != nil {
+                        Button("Open Prim", action: onOpen)
+                    } else {
                     ForEach(ConvertTarget.allCases) { t in
                         if t != .note || item.conversion != nil {
                             Button(t.menuLabel) { onConvert(t) }
                         }
                     }
+                    }
                 } label: {
-                    Text(item.conversion?.target.badge ?? "convert")
+                    Text(item.primPin == nil ? item.conversion?.target.badge ?? "convert" : "PRIM")
                         .font(Ink.small)
                         .foregroundStyle(item.conversion == nil ? Ink.mute : Ink.tabOn)
                 }

@@ -30,6 +30,7 @@ struct PrimsPasteApp: App {
             .frame(minWidth: 820, minHeight: 560)
             .background(WindowGuard())
             .onAppear { NSApp.setActivationPolicy(.regular) }
+            .sheet(isPresented: $board.showRecovery) { RecoverySheet(board: board) }
         }
         .commands {
             CommandGroup(replacing: .newItem) {
@@ -59,6 +60,12 @@ struct PrimsPasteApp: App {
                 Button("Settings") { board.showSettings = true }
                     .keyboardShortcut(",", modifiers: [.command])
                     .disabled(board.locked)
+                Button("Create Prim…") { board.showPrimLibrary = true }
+                    .keyboardShortcut("p", modifiers: [.command, .shift])
+                    .disabled(board.locked || board.recoveryNeeded)
+                Button("Import Prim folder…") { board.importPrim() }
+                    .disabled(board.locked || board.recoveryNeeded)
+                Button("Notebook recovery…") { board.showRecovery = true }
             }
         }
     }
@@ -89,6 +96,9 @@ struct UnlockView: View {
                 .foregroundStyle(Ink.accentInk)
                 if let err = board.errorText {
                     Text(err).font(Ink.small).foregroundStyle(Ink.keyTape)
+                }
+                if board.recoveryNeeded {
+                    Button("Open Recovery") { board.showRecovery = true }
                 }
             }
         }

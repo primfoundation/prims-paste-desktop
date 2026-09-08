@@ -223,11 +223,15 @@ public final class NotebookStore: @unchecked Sendable {
         }
     }
 
-    public func updatePayload(_ id: String, plaintext: Data) throws -> ItemMeta {
+    public func updatePayload(_ id: String, plaintext: Data, expected: Data? = nil) throws -> ItemMeta {
         return try storeLock.withLock {
             var index = try loadIndex()
             guard let i = index.items.firstIndex(where: { $0.id == id }) else {
                 throw NotebookError.missingBlob(id)
+            }
+            if let expected {
+                let current = try readBlob(id: id)
+                guard current == expected || current == plaintext else { throw NotebookError.staleIndex }
             }
             let sealed = try sealTransactionBlob(plaintext)
             index.items[i].bytes = plaintext.count

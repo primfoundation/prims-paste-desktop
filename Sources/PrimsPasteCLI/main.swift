@@ -24,6 +24,10 @@ enum PrimsPasteCLI {
         switch cmd {
         case .help:
             print(CLIParser.usage, terminator: "")
+        case .profiles:
+            for kit in try PrimLibrary.bundled().kits {
+                print("\(kit.pin.profileID)\t\(kit.pin.version)\t\(kit.pin.definitionSHA256)")
+            }
         case .open:
             let app = FileManager.default.homeDirectoryForCurrentUser
                 .appendingPathComponent("Applications/Primboard.app")
@@ -39,7 +43,8 @@ enum PrimsPasteCLI {
             }
             try NotebookStore.restoreBackup(from: URL(fileURLWithPath: path), to: URL(fileURLWithPath: destination), key: key)
             print("Restored to a new directory. The active notebook is unchanged.")
-        case .tabs, .tabAdd, .add, .list, .convert, .bugsFile, .bugsTasks, .importSafepaste, .wantedSeed, .backup:
+        case .tabs, .tabAdd, .add, .list, .convert, .bugsFile, .bugsTasks, .importSafepaste, .wantedSeed, .backup,
+             .primCreate, .primValidate, .primExport, .primImport:
             let store = try notebook()
             try runStore(cmd, store: store)
         }
@@ -52,6 +57,43 @@ enum PrimsPasteCLI {
 
     static func runStore(_ cmd: CLICommand, store: NotebookStore) throws {
         switch cmd {
+        case .primCreate(let profile, let version, let source, let input, let operation):
+            let library = try PrimLibrary.bundled()
+            guard let kit = library.kits.first(where: { $0.pin.profileID == profile && $0.pin.version == version }) else {
+                throw PrimLibraryError.invalid("The exact profile version is unavailable. Run profiles to list pinned definitions.")
+            }
+            let index = try store.loadIndex()
+            let title = index.items.first(where: { $0.id == source })?.caption
+            var record = try kit.draft(title: title)
+            if let input {
+                let url = URL(fileURLWithPath: input)
+                let values = try url.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey, .isSymbolicLinkKey])
+                guard values.isRegularFile == true, values.isSymbolicLink != true, (values.fileSize ?? Int.max) <= 512 * 1024 else {
+                    throw PrimLibraryError.invalid("Input must be a local regular JSON file no larger than 512 KiB.")
+                }
+                let supplied = try PrimJSON.parse(Data(contentsOf: url))
+                guard let object = supplied.object else { throw PrimLibraryError.invalid("Record input must be an object.") }
+                record = .object((record.object ?? [:]).merging(object, uniquingKeysWith: { _, new in new }))
+            }
+            let op = operation ?? "prim_" + UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
+            // Reuse the operation identity as the draft identity for idempotent CLI retries.
+            if input == nil { var object = record.object!; object[kit.identityField] = .string(op.replacingOccurrences(of: "_", with: "-")); record = .object(object) }
+            let item = try store.createPrim(sourceID: source, kit: kit, record: record, operationID: op)
+            print("\(item.id)\t\(kit.pin.profileID)\t\(kit.pin.version)")
+        case .primValidate(let id):
+            let index = try store.loadIndex()
+            guard let pin = index.items.first(where: { $0.id == id })?.primPin else { throw PrimLibraryError.invalid("Item is not a pinned Prim record.") }
+            let kit = try PrimLibrary.bundled().kit(for: pin)
+            try kit.requireValid(PrimJSON.parse(store.readBlob(id: id)))
+            print("Structure and declared references passed. Facts and authorization were not verified.")
+        case .primExport(let id, let destination):
+            try store.exportPrim(id, library: PrimLibrary.bundled(), to: URL(fileURLWithPath: destination))
+            print("Exported local, unencrypted Prim files to a new folder.")
+        case .primImport(let path):
+            let (kit, record) = try PrimPack.read(URL(fileURLWithPath: path), library: PrimLibrary.bundled())
+            let op = "prim_" + UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
+            let item = try store.createPrim(sourceID: nil, kit: kit, record: record, operationID: op)
+            print("\(item.id)\t\(kit.pin.profileID)\timported into encrypted notebook")
         case .backup(let path):
             try store.exportBackup(to: URL(fileURLWithPath: path))
             print("Encrypted backup saved. Restore requires the existing notebook key.")

@@ -31,6 +31,22 @@ final class Board: ObservableObject {
     @Published var newTabTitle = ""
     @Published var newTabColor = Color(red: 0.77, green: 0.36, blue: 0.15)
     @Published var taskSession: TaskSession?
+    @Published var primSession: PrimSession?
+    @Published var showPrimLibrary = false
+    @Published var showRecovery = false
+    @Published var recoveryNeeded = false
+    @Published var reloadGeneration = 0
+    private struct PendingNote { var text: String; let expected: Data }
+    private var pendingNotes: [String: PendingNote] = [:]
+
+    struct PrimSession: Identifiable {
+        let id: String
+        let sourceID: String?
+        let existingID: String?
+        let kit: PrimKit
+        let record: PrimJSON
+        let expected: Data?
+    }
 
     struct TaskSession: Identifiable {
         var stickyID: String
@@ -117,6 +133,9 @@ final class Board: ObservableObject {
             || showSettings
             || showNewTab
             || showCalendar
+            || showPrimLibrary
+            || primSession != nil
+            || showRecovery
     }
 
     var hoverTab: BoardTab? {
@@ -166,11 +185,22 @@ final class Board: ObservableObject {
     }
 
     func lockNotebook() {
+        flushNotes()
+        for task in noteTasks.values { task.cancel() }
+        noteTasks.removeAll()
         cache.removeAll()
         typedPaste = ""
         selectedID = nil
         drag = nil
         voice.cancel()
+        primSession = nil
+        taskSession = nil
+        showPrimLibrary = false
+        showRecovery = false
+        store = nil
+        items = []
+        tabs = []
+        chat = .none
         locked = true
         shuttered = false
     }
@@ -202,23 +232,131 @@ final class Board: ObservableObject {
             unlockedOnce = true
             shuttered = false
             lastPoke = Date()
+            recoveryNeeded = false
         } catch {
-            errorText = "\(error)"
-            locked = false
-            unlockedOnce = true
+            self.store = nil
+            items = []; tabs = []; cache.removeAll()
+            errorText = "The notebook could not be opened. Its files have been preserved. Open Recovery to retry or restore a backup to a separate folder."
+            recoveryNeeded = true
+            locked = true
             shuttered = false
         }
     }
 
+    func reloadNotebook() {
+        guard let store, !locked else { return }
+        do {
+            let index = try store.loadIndex()
+            items = index.items; tabs = index.tabs; chat = index.chat
+            cache.removeAll(); reloadGeneration += 1
+            recoveryNeeded = false
+            errorText = nil
+        } catch {
+            recoveryNeeded = true
+            errorText = "Recovery could not finish. Keep this notebook and its key. You can restore an encrypted backup to a separate folder."
+            showRecovery = true
+        }
+    }
+
+    func storeFailed(_ error: Error) {
+        // A journal may already have committed. Reconcile before accepting another write.
+        for task in noteTasks.values { task.cancel() }
+        noteTasks.removeAll()
+        reloadNotebook()
+        errorText = recoveryNeeded
+            ? "The notebook needs recovery. Files and pending edits have been preserved."
+            : "The notebook was reloaded after a storage error. Check the latest contents before repeating the operation. Pending note edits remain available in Recovery."
+        showRecovery = true
+    }
+
+    func flushNotes() {
+        guard !locked, !recoveryNeeded else { return }
+        for (id, draft) in Array(pendingNotes) { writeNote(id, text: draft.text) }
+    }
+
+    var pendingEditCount: Int { pendingNotes.count }
+
+    func retryPendingNotes() {
+        reloadNotebook()
+        guard !recoveryNeeded else { return }
+        flushNotes()
+    }
+
+    func startPrim(_ kit: PrimKit) {
+        do {
+            let source = items.first { $0.id == selectedID }
+            let record = try kit.draft(title: source?.caption)
+            primSession = PrimSession(id: "prim_" + UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased(),
+                                      sourceID: source?.id, existingID: nil, kit: kit, record: record, expected: nil)
+            showPrimLibrary = false
+        } catch { errorText = error.localizedDescription }
+    }
+
+    func openPrim(_ id: String) {
+        guard let store, let item = items.first(where: { $0.id == id }), let pin = item.primPin else { return }
+        do {
+            let kit = try PrimLibrary.bundled().kit(for: pin)
+            let data = try store.readBlob(id: id)
+            let record = try PrimJSON.parse(data)
+            primSession = PrimSession(id: id, sourceID: item.primSourceID, existingID: id, kit: kit, record: record, expected: data)
+        } catch { errorText = error.localizedDescription }
+    }
+
+    func savePrim(_ session: PrimSession, record: PrimJSON) throws {
+        guard let store, !locked, !recoveryNeeded else { throw PrimLibraryError.invalid("Unlock and recover the notebook before saving.") }
+        let meta: ItemMeta
+        do {
+            if let existing = session.existingID, let expected = session.expected {
+                meta = try store.updatePrim(existing, kit: session.kit, record: record, expected: expected)
+            } else {
+                meta = try store.createPrim(sourceID: session.sourceID, kit: session.kit, record: record, operationID: session.id)
+            }
+        } catch let error as PrimLibraryError { throw error }
+        catch { storeFailed(error); throw error }
+        reloadNotebook()
+        selectedID = meta.id; selectedTabID = meta.tabID
+        primSession = nil
+    }
+
+    func exportPrim(_ id: String) {
+        guard let store, !locked, !recoveryNeeded else { return }
+        let panel = NSSavePanel(); panel.nameFieldStringValue = "Record.prim"
+        panel.message = "Export a new Prim folder. These files are readable outside Primboard and are not encrypted."
+        guard panel.runModal() == .OK, let target = panel.url else { return }
+        do {
+            try store.exportPrim(id, library: PrimLibrary.bundled(), to: target)
+            NSWorkspace.shared.activateFileViewerSelecting([target])
+        } catch { errorText = error.localizedDescription }
+    }
+
+    func importPrim() {
+        guard !locked, !recoveryNeeded else { return }
+        let panel = NSOpenPanel(); panel.canChooseFiles = false; panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        guard panel.runModal() == .OK, let source = panel.url else { return }
+        do {
+            let (kit, record) = try PrimPack.read(source, library: PrimLibrary.bundled())
+            primSession = PrimSession(id: "prim_" + UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased(),
+                                      sourceID: nil, existingID: nil, kit: kit, record: record, expected: nil)
+        } catch { errorText = error.localizedDescription }
+    }
+
+    func authenticateForRecovery() async -> Bool {
+        if !locked { return true }
+        let context = LAContext()
+        do { return try await context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: "Restore a Primboard backup") }
+        catch { return false }
+    }
+
     func payload(_ id: String) -> Data? {
         if let hit = cache.get(id) { return hit }
-        guard let store else { return nil }
+        guard let store, !locked, !recoveryNeeded else { return nil }
         do {
             let data = try store.readBlob(id: id)
             cache.set(id, data)
             return data
         } catch {
-            errorText = "\(error)"
+            storeFailed(error)
             return nil
         }
     }
@@ -280,7 +418,7 @@ final class Board: ObservableObject {
 
     func attachImage(to id: String, _ data: Data) {
         poke()
-        guard let store, !data.isEmpty else { return }
+        guard let store, !locked, !recoveryNeeded, !data.isEmpty else { return }
         do {
             try store.writeImage(id, png: data)
             if let i = items.firstIndex(where: { $0.id == id }) {
@@ -288,13 +426,13 @@ final class Board: ObservableObject {
             }
             cache.set("\(id)-img", data)
         } catch {
-            errorText = "\(error)"
+            storeFailed(error)
         }
     }
 
     func imageAttachment(_ id: String) -> Data? {
         if let hit = cache.get("\(id)-img") { return hit }
-        guard let store else { return nil }
+        guard let store, !locked, !recoveryNeeded else { return nil }
         do {
             let data = try store.readImage(id)
             if let data { cache.set("\(id)-img", data) }
@@ -324,7 +462,7 @@ final class Board: ObservableObject {
         looksLikeKey: Bool = false,
         keyKind: String? = nil
     ) -> ItemMeta? {
-        guard let store else { return nil }
+        guard let store, !locked, !recoveryNeeded else { return nil }
         let p = point ?? pin
         do {
             let meta = try store.add(
@@ -344,7 +482,7 @@ final class Board: ObservableObject {
         } catch NotebookError.emptyPayload {
             return nil
         } catch {
-            errorText = "\(error)"
+            storeFailed(error)
             return nil
         }
     }
@@ -374,16 +512,16 @@ final class Board: ObservableObject {
             drag = nil
             hoverTabID = nil
         }
-        guard let session = drag, let i = items.firstIndex(where: { $0.id == session.id }) else { return }
-        if let front = try? store?.bringToFront(session.id) {
-            items[i] = front
-        }
+        guard let store, !locked, !recoveryNeeded, let session = drag,
+              let i = items.firstIndex(where: { $0.id == session.id }) else { return }
+        do { items[i] = try store.bringToFront(session.id) }
+        catch { storeFailed(error); return }
         if let tabID = hoverTabID, tabID != items[i].tabID {
             do {
-                items[i] = try store?.assignTab(session.id, tabID: tabID) ?? items[i]
+                items[i] = try store.assignTab(session.id, tabID: tabID)
                 selectedTabID = tabID
             } catch {
-                errorText = "\(error)"
+                storeFailed(error)
             }
             return
         }
@@ -393,20 +531,20 @@ final class Board: ObservableObject {
             board: CGSize(width: BoardMetrics.width, height: BoardMetrics.height),
             sticky: CGSize(width: items[i].width, height: items[i].height)
         )
-        items[i].x = next.x
-        items[i].y = next.y
-        try? store?.updateFrame(
+        do { try store.updateFrame(
             session.id,
             x: next.x,
             y: next.y,
             width: items[i].width,
             height: items[i].height
         )
+            items[i].x = next.x; items[i].y = next.y
+        } catch { storeFailed(error) }
     }
 
     func createTab() {
         let title = newTabTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !title.isEmpty, let store else { return }
+        guard !title.isEmpty, let store, !locked, !recoveryNeeded else { return }
         do {
             let tab = try store.addTab(title: title, colorHex: newTabColor.hex)
             tabs.append(tab)
@@ -415,7 +553,7 @@ final class Board: ObservableObject {
             showNewTab = false
             poke()
         } catch {
-            errorText = "\(error)"
+            storeFailed(error)
         }
     }
 
@@ -424,7 +562,10 @@ final class Board: ObservableObject {
             errorText = "local models only — endpoint must be localhost"
             return
         }
-        try? store?.saveChat(chat)
+        do {
+            guard let store, !locked, !recoveryNeeded else { return }
+            try store.saveChat(chat)
+        } catch { storeFailed(error); return }
         showSettings = false
         poke()
     }
@@ -439,14 +580,14 @@ final class Board: ObservableObject {
             do {
                 _ = try await convertNow(id, to: target)
             } catch {
-                errorText = "\(error)"
+                storeFailed(error)
             }
         }
     }
 
     func convertNow(_ id: String, to target: ConvertTarget) async throws -> ItemMeta {
         poke()
-        guard let store else { throw NotebookError.convert("store closed") }
+        guard let store, !locked, !recoveryNeeded else { throw NotebookError.convert("store closed") }
         if target == .note {
             if let conv = items.first(where: { $0.id == id })?.conversion {
                 try ConvertLive.shared.revert(conv)
@@ -484,7 +625,7 @@ final class Board: ObservableObject {
                 let card = try ConvertLive.shared.viewTask(id: tid)
                 taskSession = TaskSession(stickyID: id, card: card)
             } catch {
-                errorText = "\(error)"
+                storeFailed(error)
             }
         }
     }
@@ -513,7 +654,7 @@ final class Board: ObservableObject {
                 taskSession = session
             }
         } catch {
-            errorText = "\(error)"
+            storeFailed(error)
         }
     }
 
@@ -522,19 +663,26 @@ final class Board: ObservableObject {
     }
 
     func saveCaption(_ id: String, _ caption: String) {
-        guard let store else { return }
+        guard let store, !locked, !recoveryNeeded else { return }
         do {
             let meta = try store.updateCaption(id, caption: caption)
             if let i = items.firstIndex(where: { $0.id == id }) {
                 items[i] = meta
             }
         } catch {
-            errorText = "\(error)"
+            storeFailed(error)
         }
     }
 
     func saveNote(_ id: String, text: String) {
         poke()
+        guard let store, !locked, !recoveryNeeded else { return }
+        do {
+            let expected: Data
+            if let prior = pendingNotes[id]?.expected ?? cache.get(id) { expected = prior }
+            else { expected = try store.readBlob(id: id) }
+            pendingNotes[id] = PendingNote(text: text, expected: expected)
+        } catch { storeFailed(error); return }
         noteTasks[id]?.cancel()
         noteTasks[id] = Task { [weak self] in
             try? await Task.sleep(nanoseconds: 350_000_000)
@@ -544,24 +692,25 @@ final class Board: ObservableObject {
     }
 
     private func writeNote(_ id: String, text: String) {
-        guard let store else { return }
+        guard let store, !locked, !recoveryNeeded else { return }
         let data = Data(text.utf8)
         guard !data.isEmpty else { return }
         do {
-            let meta = try store.updatePayload(id, plaintext: data)
+            let meta = try store.updatePayload(id, plaintext: data, expected: pendingNotes[id]?.expected)
             cache.set(id, data)
+            pendingNotes.removeValue(forKey: id)
             if let i = items.firstIndex(where: { $0.id == id }) {
                 items[i] = meta
             }
         } catch NotebookError.emptyPayload {
             return
         } catch {
-            errorText = "\(error)"
+            storeFailed(error)
         }
     }
 
     func saveAudio(_ id: String, data: Data) {
-        guard let store else { return }
+        guard let store, !locked, !recoveryNeeded else { return }
         do {
             let meta = try store.updatePayload(id, plaintext: data)
             cache.set(id, data)
@@ -569,7 +718,7 @@ final class Board: ObservableObject {
                 items[i] = meta
             }
         } catch {
-            errorText = "\(error)"
+            storeFailed(error)
         }
     }
 
@@ -579,13 +728,17 @@ final class Board: ObservableObject {
     }
 
     func delete(_ id: String) {
+        guard let store, !locked, !recoveryNeeded else { return }
         do {
-            try store?.remove(id)
+            try store.remove(id)
+            noteTasks[id]?.cancel()
+            noteTasks.removeValue(forKey: id)
+            pendingNotes.removeValue(forKey: id)
             cache.remove(id)
             items.removeAll { $0.id == id }
             if selectedID == id { selectedID = nil }
         } catch {
-            errorText = "\(error)"
+            storeFailed(error)
         }
     }
 
