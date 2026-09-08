@@ -450,17 +450,12 @@
         "profile_version": "0.1.0-dev.1",
         "id": "prim-fixture",
         "title": "Untitled decision",
-        "question": "Choose?",
+        "question": null,
         "status": "accepted",
-        "options": [
-          {
-            "id": "a",
-            "description": "Option A"
-          }
-        ],
-        "rationale": "Recorded reason",
-        "chosen_option": "missing",
-        "authority_as_recorded": "Recorded owner"
+        "options": [],
+        "rationale": null,
+        "chosen_option": null,
+        "authority_as_recorded": null
       },
       "valid": false
     },
@@ -483,7 +478,7 @@
           }
         ],
         "rationale": "Recorded reason",
-        "chosen_option": "missing",
+        "chosen_option": "a",
         "authority_as_recorded": "Recorded owner"
       },
       "valid": true
@@ -1308,13 +1303,7 @@
         "question": null,
         "workflow_state": "draft",
         "outcome": "unresolved",
-        "sources": [
-          {
-            "id": "s",
-            "locator": "local-fixture",
-            "kind": "artifact"
-          }
-        ],
+        "sources": [],
         "claims": [
           {
             "id": "c",
@@ -1323,14 +1312,7 @@
             "support_state": "supported"
           }
         ],
-        "evidence": [
-          {
-            "id": "e",
-            "claim_id": "c",
-            "source_id": "absent",
-            "relation": "supports"
-          }
-        ],
+        "evidence": [],
         "activities": [],
         "reviews": []
       },
@@ -1368,7 +1350,7 @@
           {
             "id": "e",
             "claim_id": "c",
-            "source_id": "absent",
+            "source_id": "s",
             "relation": "supports"
           }
         ],
@@ -1656,7 +1638,7 @@
         "periods": [],
         "worksheets": [
           {
-            "n": 1.5,
+            "n": true,
             "id": "w",
             "role": "other",
             "pack": "w",

@@ -27,7 +27,11 @@ extension NotebookStore {
                                 z: DragMath.nextZ(index.items), primPin: kit.pin, primSourceID: sourceID)
             index.items.append(item)
             try commit(index, writes: ["\(operationID).enc": try sealTransactionBlob(data)])
-            return item
+            // Return the persisted timestamp precision so an idempotent retry matches.
+            guard let persisted = try loadIndex().items.first(where: { $0.id == operationID }) else {
+                throw NotebookError.missingBlob(operationID)
+            }
+            return persisted
         }
     }
 
@@ -69,10 +73,23 @@ extension NotebookStore {
 /// Same directory pack consumed by the Foundation Python and TypeScript readers.
 /// Export is an explicit plaintext operation; it never overwrites an existing pack.
 public enum PrimPack {
+    private static func localURL(_ url: URL) -> URL {
+        var path = url.standardizedFileURL.path
+        // macOS exposes temporary folders through OS-owned aliases.
+        // Arbitrary user-created symlinks remain rejected below.
+        for alias in ["/var", "/tmp"] where path.hasPrefix(alias + "/") {
+            if (try? FileManager.default.destinationOfSymbolicLink(atPath: alias)) == "/private" + alias {
+                path = "/private" + path
+                break
+            }
+        }
+        return URL(fileURLWithPath: path)
+    }
+
     public static func write(record: PrimJSON, kit: PrimKit, to destination: URL) throws {
         try kit.requireValid(record)
         let fm = FileManager.default
-        let target = destination.standardizedFileURL
+        let target = localURL(destination)
         var parent = target.deletingLastPathComponent()
         while parent.path != "/" {
             let values = try parent.resourceValues(forKeys: [.isSymbolicLinkKey, .isDirectoryKey])
@@ -105,7 +122,7 @@ public enum PrimPack {
     }
 
     public static func read(_ source: URL, library: PrimLibrary) throws -> (PrimKit, PrimJSON) {
-        let root = source.standardizedFileURL
+        let root = localURL(source)
         guard try root.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey]).isDirectory == true,
               root.resolvingSymlinksInPath().path == root.path else { throw PrimLibraryError.invalid("Choose a local Prim folder without symbolic links.") }
         func read(_ name: String) throws -> Data {
