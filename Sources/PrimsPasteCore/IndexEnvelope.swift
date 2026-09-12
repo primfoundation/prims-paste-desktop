@@ -25,8 +25,8 @@ enum IndexEnvelope {
 
     static func decode(_ plaintext: Data) throws -> NotebookIndex {
         guard let object = try JSONSerialization.jsonObject(with: plaintext) as? [String: Any],
-              object["items"] is [Any],
-              [1, 2].contains(object["version"] as? Int ?? 1) else { throw NotebookError.indexCorrupt }
+              object["items"] is [Any] else { throw NotebookError.indexCorrupt }
+        try NotebookCompatibility.requireSupported(object)
         let decoder = JSONDecoder(); decoder.dateDecodingStrategy = .iso8601
         let index = try decoder.decode(NotebookIndex.self, from: plaintext)
         guard Set(index.items.map(\.id)).count == index.items.count,
@@ -48,3 +48,4 @@ enum IndexEnvelope {
             && !id.contains("/") && !id.contains("\\") && !id.unicodeScalars.contains(where: { $0.value < 32 })
     }
 }
+

@@ -144,3 +144,32 @@ Apple acceptance, existing-store migration, or TCC. These remain explicit gates.
 Implementation follows Apple's guidance for
 [nested code signatures](https://developer.apple.com/library/archive/technotes/tn2206/_index.html)
 and [notarization workflows](https://developer.apple.com/documentation/security/customizing-the-notarization-workflow).
+
+
+## September 12 existing-store acceptance finding
+
+The signed, Apple-notarized `9f7a0086ad0f` candidate was installed with a matched
+CLI only after an independently verified app/store checkpoint. Opening the existing
+notebook failed before migration because the installed development app had newer
+item types and metadata than this clean source. The original app and CLI were
+restored; every original notebook file remained byte-identical. A signature or
+fresh-fixture selftest therefore does not establish existing-store compatibility.
+
+The upgrade boundary now refuses unknown notebook fields, item kinds, conversion
+targets and future versions with an actionable unsupported-format error. It never
+silently strips those fields, calls that condition corruption, or rewrites the
+index. Reconcile the existing implementation's video/layout/caption semantics
+before another device installation; removing those fields is not a migration.
+
+Key creation also refuses a missing key when notebook files already exist, and
+concurrent first-launch app/CLI processes adopt the winning Keychain entry instead
+of replacing it. Explicit key replacement is refused; rotation needs a separate
+validated migration. Synthetic injected-key tests never touch the real Keychain.
+
+Until native complete-pack storage is implemented, Primboard refuses packs with
+additional files and captured Research with embedded artifact references. Use the
+Hub workbench or Foundation complete-pack tools to retain those bytes. This guard
+prevents attachment loss; it does not complete native attachment support.
+
+Foundation requirements: HUM-002/004, SEC-001, RELENG-002/003 and the D95-04/05
+work packages. Independent review and signed installed acceptance remain open.
