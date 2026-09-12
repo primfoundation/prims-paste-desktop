@@ -33,12 +33,15 @@ public struct Conversion: Codable, Equatable, Sendable {
     public var ref: String
     public var title: String
     public var createdAt: Date
+    /// Preserve the historical string or structured comment exactly as JSON data.
+    public var lastComment: PrimJSON?
 
-    public init(target: ConvertTarget, ref: String, title: String, createdAt: Date = Date()) {
+    public init(target: ConvertTarget, ref: String, title: String, createdAt: Date = Date(), lastComment: PrimJSON? = nil) {
         self.target = target
         self.ref = ref
         self.title = title
         self.createdAt = createdAt
+        self.lastComment = lastComment
     }
 }
 
@@ -66,3 +69,4 @@ public enum Convert {
 public protocol ConvertRunning: Sendable {
     func convert(target: ConvertTarget, stickyID: String, caption: String) throws -> Conversion
 }
+

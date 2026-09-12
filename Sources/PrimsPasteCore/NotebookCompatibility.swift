@@ -16,6 +16,9 @@ enum NotebookCompatibility {
             if let kind = item["kind"] as? String, ItemKind(rawValue: kind) == nil {
                 throw NotebookError.indexUnsupported
             }
+            if let origin = item["captionSource"] as? String, CaptionSource(rawValue: origin) == nil {
+                throw NotebookError.indexUnsupported
+            }
             // The old description spelling has a defined caption migration.
             // Conflicting simultaneous spellings would otherwise discard a value.
             if let description = item["description"] as? String,
@@ -23,7 +26,11 @@ enum NotebookCompatibility {
                 throw NotebookError.indexUnsupported
             }
             if let conversion = item["conversion"] as? [String: Any] {
-                try keys(conversion, ["target", "ref", "title", "createdAt"])
+                try keys(conversion, ["target", "ref", "title", "createdAt", "lastComment"])
+                if let comment = conversion["lastComment"], !(comment is NSNull) {
+                    // Refuse nonportable numeric/depth values before Codable could round them.
+                    _ = try PrimJSON.parse(JSONSerialization.data(withJSONObject: comment, options: [.fragmentsAllowed]), maximum: IndexEnvelope.maximumBytes)
+                }
                 if let target = conversion["target"] as? String, ConvertTarget(rawValue: target) == nil {
                     throw NotebookError.indexUnsupported
                 }
@@ -31,6 +38,9 @@ enum NotebookCompatibility {
             if let pin = item["primPin"] as? [String: Any] {
                 try keys(pin, ["profile_id", "version", "definition_sha256"])
             }
+        }
+        for worker in object["workers"] as? [[String: Any]] ?? [] {
+            try keys(worker, ["id", "kind", "stickyID", "title", "status", "detail", "createdAt", "updatedAt"])
         }
         for tab in object["tabs"] as? [[String: Any]] ?? [] {
             try keys(tab, ["id", "title", "colorHex", "createdAt"])
@@ -40,3 +50,4 @@ enum NotebookCompatibility {
         }
     }
 }
+

@@ -19,7 +19,7 @@ final class UpgradeBoundaryTests: XCTestCase {
             var value = baseline
             var items = try XCTUnwrap(value["items"] as? [[String: Any]])
             switch change {
-            case "kind": items[0]["kind"] = "video"
+            case "kind": items[0]["kind"] = "future-media"
             case "item": items[0]["future_layout"] = "retain this"
             case "root": value["future_root"] = NSNull()
             case "tab":
@@ -88,3 +88,4 @@ final class UpgradeBoundaryTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
     }
 }
+
