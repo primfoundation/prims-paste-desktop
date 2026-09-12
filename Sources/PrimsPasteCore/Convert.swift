@@ -8,6 +8,10 @@ public enum ConvertTarget: String, Codable, CaseIterable, Sendable, Identifiable
     case docketTask = "docket"
     case paseoAgent = "paseo"
     case note = "note"
+    /// Retained link from the newer notebook; execution is not supported here.
+    case secret = "secret"
+
+    public static var availableTargets: [ConvertTarget] { [.docketTask, .paseoAgent, .note] }
 
     public var id: String { rawValue }
 
@@ -16,6 +20,7 @@ public enum ConvertTarget: String, Codable, CaseIterable, Sendable, Identifiable
         case .docketTask: return "Docket task"
         case .paseoAgent: return "Paseo agent"
         case .note: return "Note"
+        case .secret: return "Prims Secret"
         }
     }
 
@@ -24,6 +29,7 @@ public enum ConvertTarget: String, Codable, CaseIterable, Sendable, Identifiable
         case .docketTask: return "DOCKET"
         case .paseoAgent: return "PASEO"
         case .note: return "NOTE"
+        case .secret: return "PRIMS"
         }
     }
 }
@@ -33,12 +39,15 @@ public struct Conversion: Codable, Equatable, Sendable {
     public var ref: String
     public var title: String
     public var createdAt: Date
+    /// Preserve the historical string or structured comment exactly as JSON data.
+    public var lastComment: PrimJSON?
 
-    public init(target: ConvertTarget, ref: String, title: String, createdAt: Date = Date()) {
+    public init(target: ConvertTarget, ref: String, title: String, createdAt: Date = Date(), lastComment: PrimJSON? = nil) {
         self.target = target
         self.ref = ref
         self.title = title
         self.createdAt = createdAt
+        self.lastComment = lastComment
     }
 }
 

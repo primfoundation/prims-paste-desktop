@@ -49,6 +49,8 @@ public struct ConvertLive: ConvertRunning, Sendable {
             return try createPaseo(stickyID: stickyID, title: title)
         case .note:
             throw NotebookError.convert("note is revert, not create")
+        case .secret:
+            throw NotebookError.convert("Secret links are retained; this build cannot create them")
         }
     }
 
@@ -112,6 +114,8 @@ public struct ConvertLive: ConvertRunning, Sendable {
             }
         case .paseoAgent, .note:
             break
+        case .secret:
+            throw NotebookError.convert("Secret links are retained; use the previous app to change this link")
         }
     }
 

@@ -372,6 +372,17 @@ struct BoardView: View {
                 onPlay: { play(item) },
                 onStopPlay: { audio.stopPlay() }
             )
+        case .file, .video:
+            StickyCard(item: item, selected: board.selectedID == item.id, listening: false,
+                       dragging: dragging, lift: lift,
+                       onSelect: { board.selectedID = item.id; board.poke() },
+                       onDelete: { board.delete(item.id) }, onDragBegin: begin,
+                       onDragChanged: changed, onDragEnded: ended, onConvert: convert, onOpen: open) {
+                Text(item.kind == .video ? "Video" : "File").font(.headline)
+                Text("Original bytes are retained in the encrypted notebook. Media playback is not available in this version.")
+                    .font(.caption).foregroundStyle(.secondary)
+                if let mark = item.captionSource.mark { Text(mark).font(.caption2) }
+            }
         case .image:
             ImageSticky(
                 item: item,
@@ -454,3 +465,4 @@ private struct TabFramePref: PreferenceKey {
         value.merge(nextValue(), uniquingKeysWith: { $1 })
     }
 }
+

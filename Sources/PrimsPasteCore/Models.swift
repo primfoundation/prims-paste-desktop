@@ -7,11 +7,18 @@ public enum NotebookLayout {
     public static let sticky: Double = 230
 }
 
+public enum CaptionSource: String, Codable, Sendable, Equatable {
+    case typed, heard
+    public var mark: String? { self == .heard ? "heard" : nil }
+}
+
 public enum ItemKind: String, Codable, CaseIterable, Sendable {
     case paste
     case note
     case audio
     case image
+    case file
+    case video
 }
 
 public struct BoardTab: Codable, Identifiable, Equatable, Sendable {
@@ -46,6 +53,9 @@ public struct ItemMeta: Codable, Identifiable, Equatable, Sendable {
     public var fingerprint: String?
     /// Spoken / typed caption. Metadata only — never the payload.
     public var caption: String
+    public var captionSource: CaptionSource
+    /// Preserve the stored column spelling, including unknown future columns.
+    public var lane: String
     public var looksLikeKey: Bool
     public var keyKind: String?
     /// Local calendar day `YYYY-MM-DD`. Kept so old files still load.
@@ -74,6 +84,8 @@ public struct ItemMeta: Codable, Identifiable, Equatable, Sendable {
         bytes: Int,
         fingerprint: String? = nil,
         caption: String = "",
+        captionSource: CaptionSource = .typed,
+        lane: String = "inbox",
         looksLikeKey: Bool = false,
         keyKind: String? = nil,
         day: String? = nil,
@@ -95,6 +107,8 @@ public struct ItemMeta: Codable, Identifiable, Equatable, Sendable {
         self.bytes = bytes
         self.fingerprint = fingerprint
         self.caption = caption
+        self.captionSource = captionSource
+        self.lane = lane
         self.looksLikeKey = looksLikeKey
         self.keyKind = keyKind
         let d = day ?? Self.dayString(from: createdAt)
@@ -122,6 +136,9 @@ public struct ItemMeta: Codable, Identifiable, Equatable, Sendable {
         caption = try c.decodeIfPresent(String.self, forKey: .caption)
             ?? c.decodeIfPresent(String.self, forKey: .description)
             ?? ""
+        captionSource = try c.decodeIfPresent(CaptionSource.self, forKey: .captionSource)
+            ?? ((kind == .audio || kind == .video) && !caption.isEmpty ? .heard : .typed)
+        lane = try c.decodeIfPresent(String.self, forKey: .lane) ?? "inbox"
         looksLikeKey = try c.decodeIfPresent(Bool.self, forKey: .looksLikeKey) ?? false
         keyKind = try c.decodeIfPresent(String.self, forKey: .keyKind)
         day = try c.decodeIfPresent(String.self, forKey: .day) ?? Self.dayString(from: createdAt)
@@ -135,6 +152,7 @@ public struct ItemMeta: Codable, Identifiable, Equatable, Sendable {
 
     enum CodingKeys: String, CodingKey, CaseIterable {
         case id, kind, x, y, width, height, createdAt, updatedAt, bytes, fingerprint
+        case captionSource, lane
         case caption, description, looksLikeKey, keyKind, day, tabID, z, conversion, hasImage
         case primPin, primSourceID
     }
@@ -166,6 +184,8 @@ public struct ItemMeta: Codable, Identifiable, Equatable, Sendable {
         try c.encode(bytes, forKey: .bytes)
         try c.encodeIfPresent(fingerprint, forKey: .fingerprint)
         try c.encode(caption, forKey: .caption)
+        try c.encode(captionSource, forKey: .captionSource)
+        try c.encode(lane, forKey: .lane)
         try c.encode(looksLikeKey, forKey: .looksLikeKey)
         try c.encodeIfPresent(keyKind, forKey: .keyKind)
         try c.encode(day, forKey: .day)
@@ -185,6 +205,9 @@ public struct NotebookIndex: Codable, Equatable, Sendable {
     public var tabs: [BoardTab]
     public var chat: ChatSettings
     public var seededFeaturesWanted: Bool
+    /// Retained job records are data. Opening this notebook never resumes jobs.
+    public var workers: [RetainedWorker]
+    public var fillDefaultID: String?
 
     public init(
         version: Int = 2,
@@ -192,7 +215,9 @@ public struct NotebookIndex: Codable, Equatable, Sendable {
         items: [ItemMeta] = [],
         tabs: [BoardTab] = [],
         chat: ChatSettings = .none,
-        seededFeaturesWanted: Bool = false
+        seededFeaturesWanted: Bool = false,
+        workers: [RetainedWorker] = [],
+        fillDefaultID: String? = nil
     ) {
         self.version = version
         self.revision = revision
@@ -200,6 +225,8 @@ public struct NotebookIndex: Codable, Equatable, Sendable {
         self.tabs = tabs
         self.chat = chat
         self.seededFeaturesWanted = seededFeaturesWanted
+        self.workers = workers
+        self.fillDefaultID = fillDefaultID
     }
 
     public init(from decoder: Decoder) throws {
@@ -210,6 +237,8 @@ public struct NotebookIndex: Codable, Equatable, Sendable {
         tabs = try c.decodeIfPresent([BoardTab].self, forKey: .tabs) ?? []
         chat = try c.decodeIfPresent(ChatSettings.self, forKey: .chat) ?? .none
         seededFeaturesWanted = try c.decodeIfPresent(Bool.self, forKey: .seededFeaturesWanted) ?? false
+        workers = try c.decodeIfPresent([RetainedWorker].self, forKey: .workers) ?? []
+        fillDefaultID = try c.decodeIfPresent(String.self, forKey: .fillDefaultID)
         if tabs.isEmpty {
             tabs = Self.tabsFromDays(items)
         }
@@ -219,7 +248,7 @@ public struct NotebookIndex: Codable, Equatable, Sendable {
     }
 
     enum CodingKeys: String, CodingKey, CaseIterable {
-        case version, revision, items, tabs, chat, seededFeaturesWanted
+        case version, revision, items, tabs, chat, seededFeaturesWanted, workers, fillDefaultID
     }
 
     public static func tabsFromDays(_ items: [ItemMeta]) -> [BoardTab] {
@@ -294,4 +323,5 @@ public enum Paths {
         home.appendingPathComponent("docket")
     }
 }
+
 

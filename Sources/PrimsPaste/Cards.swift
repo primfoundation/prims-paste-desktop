@@ -32,7 +32,7 @@ struct StickyCard<Content: View>: View {
                     if item.primPin != nil {
                         Button("Open Prim", action: onOpen)
                     } else {
-                    ForEach(ConvertTarget.allCases) { t in
+                    ForEach(ConvertTarget.availableTargets) { t in
                         if t != .note || item.conversion != nil {
                             Button(t.menuLabel) { onConvert(t) }
                         }
