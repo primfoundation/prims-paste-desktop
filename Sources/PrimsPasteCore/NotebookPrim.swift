@@ -29,6 +29,7 @@ extension NotebookStore {
     /// A caller-generated operation ID makes a retry after an uncertain commit idempotent.
     public func createPrim(sourceID: String?, kit: PrimKit, record: PrimJSON, operationID: String) throws -> ItemMeta {
         try kit.requireValid(record)
+        try PrimPack.requireRecordOnly(record, kit: kit)
         let data = try record.encoded()
         guard operationID.range(of: "^prim_[a-f0-9]{32}\\z", options: .regularExpression) != nil else {
             throw PrimLibraryError.invalid("Invalid creation operation ID.")
@@ -62,6 +63,7 @@ extension NotebookStore {
     /// Unrelated notebook edits do not conflict, while concurrent record edits do.
     public func updatePrim(_ id: String, kit: PrimKit, record: PrimJSON, expected: Data) throws -> ItemMeta {
         try kit.requireValid(record)
+        try PrimPack.requireRecordOnly(record, kit: kit)
         let data = try record.encoded()
         return try storeLock.withLock {
             var index = try loadIndex()
@@ -96,6 +98,13 @@ extension NotebookStore {
 /// Same directory pack consumed by the Foundation Python and TypeScript readers.
 /// Export is an explicit plaintext operation; it never overwrites an existing pack.
 public enum PrimPack {
+    static func requireRecordOnly(_ record: PrimJSON, kit: PrimKit) throws {
+        if kit.pin.profileID == "primfoundation/research",
+           (record["sources"].array ?? []).contains(where: { $0.object?["artifact"] != nil }) {
+            throw PrimLibraryError.invalid("Captured Research requires its original attachments. This Primboard version cannot store or export them; keep the complete pack and use the Hub workbench or Foundation tools.")
+        }
+    }
+
     private static func localURL(_ url: URL) -> URL {
         var path = url.standardizedFileURL.path
         // macOS exposes temporary folders through OS-owned aliases.
@@ -123,6 +132,7 @@ public enum PrimPack {
 
     public static func write(record: PrimJSON, kit: PrimKit, to destination: URL) throws {
         try kit.requireValid(record)
+        try requireRecordOnly(record, kit: kit)
         let fm = FileManager.default
         let target = localURL(destination)
         try requireDirectory((target.path as NSString).deletingLastPathComponent)
@@ -166,8 +176,15 @@ public enum PrimPack {
         _ = try PrimJSON.parse(pinBytes)
         let pin = try JSONDecoder().decode(PrimDefinitionPin.self, from: pinBytes)
         let kit = try library.kit(for: pin)
+        let supported: Set<String> = ["index.md", "log.md", "prim-definition.lock.json", kit.authorityFile]
+        let entries = try FileManager.default.contentsOfDirectory(atPath: root.path)
+        guard Set(entries).isSubset(of: supported) else {
+            throw PrimLibraryError.invalid("This pack contains attachments or other files Primboard cannot yet retain. Keep the complete pack and use the Hub workbench or Foundation tools.")
+        }
         let record = try PrimJSON.parse(read(kit.authorityFile))
         try kit.requireValid(record)
+        try requireRecordOnly(record, kit: kit)
         return (kit, record)
     }
 }
+

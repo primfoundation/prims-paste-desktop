@@ -85,6 +85,8 @@ public final class NotebookStore: @unchecked Sendable {
                     try atomicWrite(sealed, to: indexURL, mode: 0o600)
                 }
                 return index
+            } catch NotebookError.indexUnsupported {
+                throw NotebookError.indexUnsupported
             } catch {
                 throw NotebookError.indexCorrupt
             }
@@ -473,3 +475,4 @@ public final class NotebookStore: @unchecked Sendable {
         guard fcntl(fd, F_FULLFSYNC) == 0 else { throw StoreLock.posixError() }
     }
 }
+

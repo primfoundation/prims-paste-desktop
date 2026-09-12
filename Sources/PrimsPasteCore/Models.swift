@@ -133,7 +133,7 @@ public struct ItemMeta: Codable, Identifiable, Equatable, Sendable {
         primSourceID = try c.decodeIfPresent(String.self, forKey: .primSourceID)
     }
 
-    enum CodingKeys: String, CodingKey {
+    enum CodingKeys: String, CodingKey, CaseIterable {
         case id, kind, x, y, width, height, createdAt, updatedAt, bytes, fingerprint
         case caption, description, looksLikeKey, keyKind, day, tabID, z, conversion, hasImage
         case primPin, primSourceID
@@ -218,7 +218,7 @@ public struct NotebookIndex: Codable, Equatable, Sendable {
         }
     }
 
-    enum CodingKeys: String, CodingKey {
+    enum CodingKeys: String, CodingKey, CaseIterable {
         case version, revision, items, tabs, chat, seededFeaturesWanted
     }
 
@@ -251,6 +251,7 @@ public enum NotebookError: Error, Equatable, CustomStringConvertible {
     case badMagic
     case missingBlob(String)
     case indexCorrupt
+    case indexUnsupported
     case staleIndex
     case backupInvalid
     case restoreDestinationExists
@@ -266,6 +267,7 @@ public enum NotebookError: Error, Equatable, CustomStringConvertible {
         case .badMagic: return "blob is not a Primboard sealed box"
         case .missingBlob(let id): return "missing blob for \(id)"
         case .indexCorrupt: return "notebook index is corrupt"
+        case .indexUnsupported: return "this notebook contains a newer or unsupported format; keep the previous app and original files for a compatible upgrade"
         case .staleIndex: return "notebook changed; reload before saving"
         case .backupInvalid: return "backup is incomplete, corrupt, or exceeds the supported size"
         case .restoreDestinationExists: return "restore requires a new directory; the existing notebook was not changed"
@@ -292,3 +294,4 @@ public enum Paths {
         home.appendingPathComponent("docket")
     }
 }
+
