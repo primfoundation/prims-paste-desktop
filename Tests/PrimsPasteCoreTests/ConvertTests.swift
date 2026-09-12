@@ -115,7 +115,19 @@ final class ConvertTests: XCTestCase {
     }
 
     func testTargetsAreTheOnesWeNamed() {
-        XCTAssertEqual(ConvertTarget.allCases.map(\.menuLabel), ["Docket task", "Paseo agent", "Note"])
+        XCTAssertEqual(ConvertTarget.availableTargets.map(\.menuLabel), ["Docket task", "Paseo agent", "Note"])
+        XCTAssertTrue(ConvertTarget.allCases.contains(.secret))
+    }
+
+    func testRetainedSecretLinkCannotExecuteOrRevert() throws {
+        let seen = ArgumentRecorder()
+        let live = ConvertLive { argv in
+            seen.append(argv)
+            return (0, Data())
+        }
+        XCTAssertThrowsError(try live.convert(target: .secret, stickyID: "synthetic", caption: "Synthetic"))
+        XCTAssertThrowsError(try live.revert(Conversion(target: .secret, ref: "synthetic:retained", title: "Synthetic")))
+        XCTAssertTrue(seen.snapshot().isEmpty)
     }
 
     func testDocketIDFromRef() {

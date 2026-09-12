@@ -16,8 +16,10 @@ semantics recovered from the preserved development source:
 
 The current journal, revision checks, encrypted index, exact encrypted migration
 backup, missing-key protection and same-key backup/restore stay in force. Unknown
-fields/types still fail closed. Secret conversion and unknown worker fields remain
-unsupported; this does not authorize running copied job records or external tools.
+fields/types still fail closed. Existing secret conversion links are retained as
+data, excluded from creation menus, and refused by create/revert operations before
+any external process is invoked. Unknown worker fields remain unsupported; this
+does not authorize running copied job records or external tools.
 
 The current GUI shows honest retained-file/video cards without decoding their
 binary payload as text. Playback, recording, kanban/worker controls and the broader

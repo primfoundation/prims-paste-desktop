@@ -27,6 +27,7 @@ final class LegacyNotebookTests: XCTestCase {
             title: "Synthetic", status: "running", detail: "retain status", createdAt: date, updatedAt: date)]
         let comment = PrimJSON.object(["body": .string("  Preserve spacing 漢字  "), "author": .object(["name": .string("Synthetic")])])
         index.items[0].conversion = Conversion(target: .docketTask, ref: "local#TASK-SYNTHETIC", title: "Synthetic", createdAt: date, lastComment: comment)
+        index.items[1].conversion = Conversion(target: .secret, ref: "synthetic:retained", title: "Synthetic", createdAt: date, lastComment: .string("  Legacy comment  "))
         try store.saveIndex(index)
         let expected = try store.loadIndex()
         XCTAssertEqual(expected.items[0].lane, "custom-future-column")
