@@ -75,6 +75,35 @@ final class LegacyNotebookTests: XCTestCase {
         }
     }
 
+    func testOptInPrivateSnapshotMetadata() throws {
+        let env = ProcessInfo.processInfo.environment
+        guard env["PRIMBOARD_PRIVATE_SNAPSHOT_CHECK"] == "1", let path = env["PRIMBOARD_SNAPSHOT_ROOT"] else {
+            throw XCTSkip("Private metadata integration requires an explicit retained snapshot")
+        }
+        let source = URL(fileURLWithPath: path).appendingPathComponent("index.json")
+        let original = try Data(contentsOf: source)
+        let decoded = try IndexEnvelope.decode(original)
+        let encoder = JSONEncoder(); encoder.dateEncodingStrategy = .iso8601
+        let encoded = try encoder.encode(decoded)
+        let before = try XCTUnwrap(JSONSerialization.jsonObject(with: original) as? [String: Any])
+        let after = try XCTUnwrap(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+        // Compare every original field recursively; optional defaults may be added.
+        func retained(_ original: Any, _ next: Any?) -> Bool {
+            guard let next else { return false }
+            if let object = original as? [String: Any] {
+                guard let output = next as? [String: Any] else { return false }
+                return object.allSatisfy { retained($0.value, output[$0.key]) }
+            }
+            if let array = original as? [Any] {
+                guard let output = next as? [Any], array.count == output.count else { return false }
+                return zip(array, output).allSatisfy { retained($0.0, $0.1) }
+            }
+            return (original as? NSObject)?.isEqual(next) == true
+        }
+        XCTAssertTrue(retained(before, after), "An original metadata value was changed or discarded")
+        XCTAssertTrue(try Data(contentsOf: source) == original, "Snapshot metadata was modified")
+    }
+
     /// Explicit operator-only integration; the ordinary suite never reads Keychain or private records.
     /// Input is a previously retained snapshot, never the active notebook. No record contents are logged.
     func testOptInPrivateSnapshotRoundTrip() throws {
@@ -85,6 +114,7 @@ final class LegacyNotebookTests: XCTestCase {
         let original = URL(fileURLWithPath: path).standardizedFileURL
         XCTAssertNotEqual(original.resolvingSymlinksInPath(), Paths.defaultRoot.resolvingSymlinksInPath())
         guard original.resolvingSymlinksInPath() != Paths.defaultRoot.resolvingSymlinksInPath() else { return }
+        print("Private snapshot checkpoint: loading existing Keychain item; no creation or export")
         guard let key = try KeychainKey.load() else { throw NotebookError.keychain("Original key is unavailable; no key was created") }
         let indexBytes = try Data(contentsOf: original.appendingPathComponent("index.json"))
         let expected = try IndexEnvelope.decode(IndexEnvelope.plaintext(indexBytes, key: key))
